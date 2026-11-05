@@ -131,15 +131,43 @@ export async function POST(req: Request) {
         );
       }
     }
-    // 2. Alur Pengujian / Internal (userId)
+    // 2. Alur Pengujian Unit Otomatis (Strictly Test Environment Only)
     else if (userId) {
-      if (process.env.NODE_ENV === "production") {
+      if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+        SystemLogRepository.log({
+          level: "security",
+          action: "AUTH_DEMO_BLOCKED",
+          actorId: String(userId),
+          actorEmail: "demo-attempt@blocked.local",
+          details: `Percobaan bypass otentikasi menggunakan ID ditolak di lingkungan produksi. Akses demo telah dinonaktifkan secara permanen.`,
+          status: "BLOCKED",
+        });
+
         return NextResponse.json(
           {
             success: false,
-            error: "Di lingkungan produksi, otentikasi wajib menggunakan alamat email dan kata sandi terdaftar.",
+            error: "Di lingkungan produksi, otentikasi wajib menggunakan alamat email dan kata sandi terdaftar. Akses demo telah dinonaktifkan secara permanen.",
           },
           { status: 400 }
+        );
+      }
+
+      if (process.env.NODE_ENV !== "test") {
+        SystemLogRepository.log({
+          level: "security",
+          action: "AUTH_DEMO_BLOCKED",
+          actorId: String(userId),
+          actorEmail: "demo-attempt@blocked.local",
+          details: `Percobaan bypass otentikasi menggunakan ID ditolak. Akses demo telah dinonaktifkan secara permanen.`,
+          status: "BLOCKED",
+        });
+
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Akses demo atau bypass ID telah dinonaktifkan secara permanen. Otentikasi wajib menggunakan alamat email dan kata sandi terdaftar.",
+          },
+          { status: 403 }
         );
       }
       targetUser = UserRepository.getById(String(userId).trim());

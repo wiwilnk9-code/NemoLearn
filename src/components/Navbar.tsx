@@ -34,24 +34,6 @@ export const Navbar: React.FC = () => {
       .catch(() => {});
   }, [pathname]);
 
-  const handleSwitchUser = async (userId: string) => {
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCurrentUser(data.user);
-        setIsUserMenuOpen(false);
-        router.refresh();
-      }
-    } catch (err) {
-      console.error("Gagal beralih akun:", err);
-    }
-  };
-
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -144,47 +126,12 @@ export const Navbar: React.FC = () => {
                       <p className="text-[11px] text-[#858096]">Masuk sebagai:</p>
                       <p className="text-sm font-bold text-[#302B43] truncate">{currentUser.displayName}</p>
                       <p className="text-xs text-[#858096] truncate">{currentUser.email}</p>
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <span className="text-[10px] bg-[#EDE5FF] text-[#7957E8] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                          {currentUser.role}
+                        </span>
+                      </div>
                     </div>
-
-                    <div className="px-3 py-1.5 text-[11px] font-semibold text-[#858096] uppercase tracking-wider">
-                      Uji Peran (Role RBAC Demo)
-                    </div>
-                    <button
-                      onClick={() => handleSwitchUser("usr_pelajar_01")}
-                      className={`w-full text-left px-4 py-2 text-xs hover:bg-[#F7F6FC] flex items-center justify-between ${
-                        currentUser.role === "pelajar" ? "text-[#7957E8] font-bold bg-[#EDE5FF]/50" : ""
-                      }`}
-                    >
-                      <span>Budi Santoso (Pelajar SMA)</span>
-                      <span className="text-[10px] bg-[#EDE5FF] text-[#7957E8] px-1.5 py-0.5 rounded font-bold">Pelajar</span>
-                    </button>
-                    <button
-                      onClick={() => handleSwitchUser("usr_guru_01")}
-                      className={`w-full text-left px-4 py-2 text-xs hover:bg-[#F7F6FC] flex items-center justify-between ${
-                        currentUser.role === "guru" ? "text-[#6485F5] font-bold bg-[#E7EEFF]/50" : ""
-                      }`}
-                    >
-                      <span>Siti Rahmawati (Guru SMA)</span>
-                      <span className="text-[10px] bg-[#E7EEFF] text-[#6485F5] px-1.5 py-0.5 rounded font-bold">Guru</span>
-                    </button>
-                    <button
-                      onClick={() => handleSwitchUser("usr_admin_01")}
-                      className={`w-full text-left px-4 py-2 text-xs hover:bg-[#F7F6FC] flex items-center justify-between ${
-                        currentUser.role === "admin" ? "text-[#047857] font-bold bg-[#E8FAF4]/50" : ""
-                      }`}
-                    >
-                      <span>Admin NemoLearn</span>
-                      <span className="text-[10px] bg-[#E8FAF4] text-[#047857] px-1.5 py-0.5 rounded font-bold">Admin</span>
-                    </button>
-                    <button
-                      onClick={() => handleSwitchUser("usr_owner_01")}
-                      className={`w-full text-left px-4 py-2 text-xs hover:bg-[#F7F6FC] flex items-center justify-between ${
-                        currentUser.role === "owner" ? "text-[#D97706] font-bold bg-[#FFF4E5]/50" : ""
-                      }`}
-                    >
-                      <span>Dr. Hendra Kusuma (Owner)</span>
-                      <span className="text-[10px] bg-[#FFF4E5] text-[#D97706] px-1.5 py-0.5 rounded font-bold">Owner</span>
-                    </button>
 
                     {(currentUser.role === "admin" || currentUser.role === "owner") && (
                       <div className="border-t border-[#EAE7F2] mt-1 pt-1">

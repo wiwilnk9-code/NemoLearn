@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShieldAlert, ArrowLeft, RefreshCw, Crown, ShieldCheck, Loader2, LogIn } from "lucide-react";
+import { ShieldAlert, ArrowLeft, RefreshCw, LogIn } from "lucide-react";
 import { User } from "@/types/user";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -21,7 +21,6 @@ export const AdminAccessGuard: React.FC<AdminAccessGuardProps> = ({
   onRefresh,
 }) => {
   const router = useRouter();
-  const [switchingUser, setSwitchingUser] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -34,25 +33,6 @@ export const AdminAccessGuard: React.FC<AdminAccessGuardProps> = ({
       </div>
     );
   }
-
-  const handleSwitchUser = async (userId: string) => {
-    setSwitchingUser(userId);
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      if (res.ok) {
-        if (onRefresh) onRefresh();
-        router.refresh();
-      }
-    } catch (err) {
-      console.error("Gagal beralih akun:", err);
-    } finally {
-      setSwitchingUser(null);
-    }
-  };
 
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center p-4 sm:p-6 text-center max-w-lg mx-auto animate-fade-in">
@@ -105,42 +85,6 @@ export const AdminAccessGuard: React.FC<AdminAccessGuardProps> = ({
             Portal Login Admin
           </Button>
         </Link>
-      </div>
-
-      {/* Quick Demo Switcher for Evaluation */}
-      <div className="mt-6 pt-5 border-t border-[#E2E8F0] w-full">
-        <p className="text-[11px] font-mono uppercase text-[#667085] tracking-wider mb-2.5">
-          Atau Masuk Cepat sebagai Penguji Resmi (Demo Environment):
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-2.5">
-          <Button
-            size="sm"
-            onClick={() => handleSwitchUser("usr_admin_01")}
-            disabled={!!switchingUser}
-            className="bg-[#1570EF] hover:bg-[#0B559F] text-white text-xs"
-          >
-            {switchingUser === "usr_admin_01" ? (
-              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-            ) : (
-              <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />
-            )}
-            Beralih ke Admin
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={() => handleSwitchUser("usr_owner_01")}
-            disabled={!!switchingUser}
-            className="bg-[#53389E] hover:bg-[#42307D] text-white text-xs"
-          >
-            {switchingUser === "usr_owner_01" ? (
-              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-            ) : (
-              <Crown className="w-3.5 h-3.5 mr-1.5" />
-            )}
-            Beralih ke Owner
-          </Button>
-        </div>
       </div>
 
       <Card className="mt-6 text-left w-full border-[#E2E8F0] bg-white shadow-sm">

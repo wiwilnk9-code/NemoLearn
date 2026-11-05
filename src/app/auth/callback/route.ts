@@ -50,9 +50,37 @@ export async function GET(req: Request) {
   }
 
   try {
-    // 3. Menukarkan Authorization Code menjadi Session via PKCE Flow
-    const cookieHeader = req.headers.get("cookie");
-    const supabase = createServerSupabaseClient(cookieHeader);
+    // 3. Menukarkan Authorization Code menjadi Session via PKCE Flow (@supabase/ssr)
+    const cookieQueue: Array<{ name: string; value: string; options: any }> = [];
+
+    const supabase = createServerSupabaseClient({
+      getAll() {
+        if (typeof (req as any).cookies?.getAll === "function") {
+          const all = (req as any).cookies.getAll();
+          if (all && all.length > 0) return all;
+        }
+        const cookieHeader = req.headers.get("cookie");
+        if (!cookieHeader) return [];
+        return cookieHeader
+          .split(";")
+          .map((part) => {
+            const [rawKey, ...rawVal] = part.trim().split("=");
+            return {
+              name: decodeURIComponent(rawKey || ""),
+              value: decodeURIComponent(rawVal.join("=") || ""),
+            };
+          })
+          .filter((c) => Boolean(c.name));
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach((c) => {
+          try {
+            (req as any).cookies?.set?.(c.name, c.value);
+          } catch {}
+          cookieQueue.push(c);
+        });
+      },
+    });
 
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
@@ -60,7 +88,11 @@ export async function GET(req: Request) {
       console.error("[OAuth Callback] Failed to exchange code for session:", exchangeError?.message);
       const redirectUrl = new URL("/login", req.url);
       redirectUrl.searchParams.set("error", exchangeError?.message || "Gagal memproses sesi login Google.");
-      return NextResponse.redirect(redirectUrl);
+      const errRes = NextResponse.redirect(redirectUrl);
+      cookieQueue.forEach(({ name, value, options }) => {
+        errRes.cookies.set(name, value, options);
+      });
+      return errRes;
     }
 
     const authUser = data.user;
@@ -166,6 +198,11 @@ export async function GET(req: Request) {
     }
 
     const response = NextResponse.redirect(new URL(redirectPath, req.url));
+
+    // Pasang cookie sesi Supabase Auth dari exchange PKCE (@supabase/ssr)
+    cookieQueue.forEach(({ name, value, options }) => {
+      response.cookies.set(name, value, options);
+    });
 
     // 8. Tanam Cookie Sesi HTTP-Only & Secure
     response.cookies.set({

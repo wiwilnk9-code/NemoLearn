@@ -80,6 +80,22 @@ describe("NEMOLEARN AUTHENTICATION REPAIR & GOOGLE OAUTH SUITE", () => {
     });
 
     it("menolak registrasi jika email sudah terdaftar sebelumnya (Anti-Duplikasi 409)", async () => {
+      // Pastikan akun uji ada di database
+      const existing = UserRepository.getByEmail("budi.santoso@siswa.sma.id");
+      if (!existing) {
+        UserRepository.create({
+          id: "usr_pelajar_01",
+          email: "budi.santoso@siswa.sma.id",
+          displayName: "Budi Santoso",
+          role: "pelajar",
+          status: "active",
+          verificationStatus: "verified",
+          emailVerified: true,
+          authProvider: "email",
+          createdAt: new Date().toISOString(),
+        });
+      }
+
       const req = new Request("http://localhost:3000/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -313,6 +329,91 @@ describe("NEMOLEARN AUTHENTICATION REPAIR & GOOGLE OAUTH SUITE", () => {
 
       // Verifikasi status suspended memblokir otorisasi
       assert.strictEqual(suspendedUser.status === "suspended", true);
+    });
+  });
+
+  describe("PART 4: Google OAuth PKCE SSR Architecture & Complete Demo Removal", () => {
+    it("memastikan arsitektur Supabase SSR (@supabase/ssr) digunakan untuk browser client dan server client", () => {
+      const fs = require("fs");
+      const path = require("path");
+
+      const clientSrc = fs.readFileSync(path.resolve(process.cwd(), "src/lib/supabase/client.ts"), "utf-8");
+      assert.ok(
+        clientSrc.includes("@supabase/ssr") && clientSrc.includes("createBrowserClient"),
+        "src/lib/supabase/client.ts must use createBrowserClient from @supabase/ssr"
+      );
+
+      const serverSrc = fs.readFileSync(path.resolve(process.cwd(), "src/lib/supabase/server.ts"), "utf-8");
+      assert.ok(
+        serverSrc.includes("@supabase/ssr") && serverSrc.includes("createServerClient"),
+        "src/lib/supabase/server.ts must use createServerClient from @supabase/ssr"
+      );
+    });
+
+    it("memastikan seluruh UI dan kontrol akun demo telah dihapus dari semua komponen frontend", () => {
+      const fs = require("fs");
+      const path = require("path");
+
+      // 1. Login page (src/app/login/page.tsx)
+      const loginSrc = fs.readFileSync(path.resolve(process.cwd(), "src/app/login/page.tsx"), "utf-8");
+      assert.strictEqual(loginSrc.includes("quickFillAccounts"), false, "Login page must not contain quickFillAccounts");
+      assert.strictEqual(loginSrc.includes("Isi Cepat Akun Demo"), false, "Login page must not contain demo UI");
+      assert.strictEqual(loginSrc.includes("showQuickFill"), false, "Login page must not contain showQuickFill state");
+
+      // 2. Admin login page (src/app/admin/login/page.tsx)
+      const adminLoginSrc = fs.readFileSync(path.resolve(process.cwd(), "src/app/admin/login/page.tsx"), "utf-8");
+      assert.strictEqual(adminLoginSrc.includes("handleQuickFill"), false, "Admin login page must not contain handleQuickFill");
+      assert.strictEqual(adminLoginSrc.includes("Kredensial Penguji Resmi"), false, "Admin login page must not contain demo preset");
+
+      // 3. Navbar (src/components/Navbar.tsx)
+      const navbarSrc = fs.readFileSync(path.resolve(process.cwd(), "src/components/Navbar.tsx"), "utf-8");
+      assert.strictEqual(navbarSrc.includes("handleSwitchUser"), false, "Navbar must not contain handleSwitchUser");
+      assert.strictEqual(navbarSrc.includes("Uji Peran (Role RBAC Demo)"), false, "Navbar must not contain demo role switcher");
+
+      // 4. Sidebar (src/components/Sidebar.tsx)
+      const sidebarSrc = fs.readFileSync(path.resolve(process.cwd(), "src/components/Sidebar.tsx"), "utf-8");
+      assert.strictEqual(sidebarSrc.includes("handleSwitchUser"), false, "Sidebar must not contain handleSwitchUser");
+      assert.strictEqual(sidebarSrc.includes("Beralih Akun (Demo)"), false, "Sidebar must not contain demo account switcher");
+
+      // 5. AdminAccessGuard (src/components/admin/AdminAccessGuard.tsx)
+      const guardSrc = fs.readFileSync(path.resolve(process.cwd(), "src/components/admin/AdminAccessGuard.tsx"), "utf-8");
+      assert.strictEqual(guardSrc.includes("handleSwitchUser"), false, "AdminAccessGuard must not contain handleSwitchUser");
+      assert.strictEqual(guardSrc.includes("Atau Masuk Cepat sebagai Penguji Resmi"), false, "AdminAccessGuard must not contain demo switcher");
+    });
+
+    it("memastikan endpoint login menolak bypass userId dengan 400 di lingkungan produksi", async () => {
+      const originalEnv = process.env.NODE_ENV;
+      try {
+        (process.env as any).NODE_ENV = "production";
+
+        const req = new Request("http://localhost:3000/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: "usr_admin_01" }),
+        });
+
+        const res = await loginHandler(req);
+        assert.strictEqual(res.status, 400, "Login via userId in production must return 400 Bad Request");
+        const data = await res.json();
+        assert.strictEqual(data.success, false);
+        assert.ok(data.error.includes("dinonaktifkan secara permanen") && data.error.includes("produksi"));
+      } finally {
+        (process.env as any).NODE_ENV = originalEnv;
+      }
+    });
+
+    it("memastikan dokumentasi docs/GOOGLE-OAUTH-BRANDING.md tersedia dan lengkap", () => {
+      const fs = require("fs");
+      const path = require("path");
+
+      const brandingDocPath = path.resolve(process.cwd(), "docs/GOOGLE-OAUTH-BRANDING.md");
+      assert.ok(fs.existsSync(brandingDocPath), "docs/GOOGLE-OAUTH-BRANDING.md must exist");
+
+      const docContent = fs.readFileSync(brandingDocPath, "utf-8");
+      assert.ok(docContent.includes("NemoLearn"), "Doc must reference app name NemoLearn");
+      assert.ok(docContent.includes("https://nemolearn.vercel.app/privacy"), "Doc must include privacy policy URL");
+      assert.ok(docContent.includes("https://nemolearn.vercel.app/terms"), "Doc must include terms of service URL");
+      assert.ok(docContent.includes("epbepzjheexkeqivcoql.supabase.co"), "Doc must explain Supabase domain vs custom domain");
     });
   });
 });

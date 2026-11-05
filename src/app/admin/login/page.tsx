@@ -4,8 +4,6 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ShieldCheck,
-  Crown,
   ArrowLeft,
   Loader2,
   AlertCircle,
@@ -14,7 +12,6 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-  Sparkles,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -58,12 +55,6 @@ export default function AdminLoginPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleQuickFill = (targetEmail: string, targetPass: string) => {
-    setEmail(targetEmail);
-    setPassword(targetPass);
-    setError(null);
   };
 
   return (
@@ -155,42 +146,6 @@ export default function AdminLoginPage() {
               )}
             </Button>
           </form>
-
-          {/* Quick Fill Preset for Reviewers */}
-          <div className="mt-6 pt-5 border-t border-[#E2E8F0] space-y-2">
-            <span className="text-[11px] font-mono uppercase text-[#667085] tracking-wider block font-semibold">
-              Kredensial Penguji Resmi (Auto-Fill):
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickFill("owner@nemoquiz.edu", "OwnerNemo2026!")}
-                className="p-2.5 rounded-xl border border-[#D6BBFB] bg-[#F9F5FF] text-left hover:bg-[#F4EBFF] transition"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-[#53389E]">
-                  <Crown className="w-3.5 h-3.5" />
-                  Platform Owner
-                </div>
-                <div className="text-[10px] text-[#667085] font-mono mt-0.5 truncate">
-                  owner@nemoquiz.edu
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickFill("admin@nemoquiz.edu", "AdminNemo2026!")}
-                className="p-2.5 rounded-xl border border-[#B2DDFF] bg-[#EFF8FF] text-left hover:bg-[#D1E9FF] transition"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-[#175CD3]">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  Administrator
-                </div>
-                <div className="text-[10px] text-[#667085] font-mono mt-0.5 truncate">
-                  admin@nemoquiz.edu
-                </div>
-              </button>
-            </div>
-          </div>
 
           <div className="mt-6 pt-4 border-t border-[#E2E8F0] text-center">
             <Link

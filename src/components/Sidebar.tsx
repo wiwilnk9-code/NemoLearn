@@ -16,7 +16,6 @@ import {
   ChevronDown,
   Layers,
   ShieldCheck,
-  Check,
   Flame,
   HelpCircle,
 } from "lucide-react";
@@ -52,25 +51,6 @@ export const Sidebar: React.FC = () => {
       })
       .catch(() => {});
   }, [pathname]);
-
-  const handleSwitchUser = async (userId: string) => {
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCurrentUser(data.user);
-        setIsUserMenuOpen(false);
-        setIsMobileOpen(false);
-        router.refresh();
-      }
-    } catch (err) {
-      console.error("Gagal beralih akun:", err);
-    }
-  };
 
   const handleLogout = async () => {
     try {
@@ -452,36 +432,12 @@ export const Sidebar: React.FC = () => {
                       <p className="text-[11px] text-[#64748B] truncate">
                         {currentUser.email}
                       </p>
+                      <div className="mt-1">
+                        <span className="text-[10px] bg-[#F1F5F9] text-[#475467] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                          {currentUser.role}
+                        </span>
+                      </div>
                     </div>
-
-                    <p className="px-2.5 py-1 text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">
-                      Beralih Akun (Demo)
-                    </p>
-
-                    {[
-                      { id: "usr_pelajar_01", name: "Budi (Pelajar)", role: "pelajar" },
-                      { id: "usr_guru_01", name: "Siti (Guru)", role: "guru" },
-                      { id: "usr_admin_01", name: "Admin Nemo", role: "admin" },
-                      { id: "usr_owner_01", name: "Dr. Hendra (Owner)", role: "owner" },
-                    ].map((demoUser) => {
-                      const isCurrent = currentUser.role === demoUser.role;
-                      return (
-                        <button
-                          key={demoUser.id}
-                          type="button"
-                          onClick={() => handleSwitchUser(demoUser.id)}
-                          className={cn(
-                            "w-full text-left px-2.5 py-2 text-xs rounded-xl flex items-center justify-between transition-colors",
-                            isCurrent
-                              ? "bg-[#F0FDF4] text-[#15803D] font-bold"
-                              : "text-[#0F172A] hover:bg-[#FAF9F5]"
-                          )}
-                        >
-                          <span>{demoUser.name}</span>
-                          {isCurrent && <Check className="w-3.5 h-3.5 text-[#16A34A]" />}
-                        </button>
-                      );
-                    })}
 
                     <div className="border-t border-[#F3F4EE] mt-1.5 pt-1">
                       <button

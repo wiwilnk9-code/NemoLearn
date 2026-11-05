@@ -13,13 +13,9 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
-  ShieldCheck,
-  ChevronDown,
-  Sparkles,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { clientLogin, clientSignInWithGoogle } from "@/lib/auth/client";
 
 export default function LoginPage() {
@@ -30,7 +26,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deletedMsg, setDeletedMsg] = useState(false);
-  const [showQuickFill, setShowQuickFill] = useState(false);
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -122,37 +117,6 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
-
-  const quickFillAccounts = [
-    {
-      label: "Pelajar (Budi Santoso)",
-      email: "budi.santoso@siswa.sma.id",
-      pass: "PelajarNemo2026!",
-      role: "pelajar",
-      color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    },
-    {
-      label: "Guru SMA (Siti Rahmawati)",
-      email: "siti.rahmawati@guru.sma.id",
-      pass: "GuruNemo2026!",
-      role: "guru",
-      color: "bg-blue-50 text-blue-700 border-blue-200",
-    },
-    {
-      label: "Admin NemoQUIZ",
-      email: "admin@nemoquiz.edu",
-      pass: "AdminNemo2026!",
-      role: "admin",
-      color: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    },
-    {
-      label: "Platform Owner",
-      email: "owner@nemoquiz.edu",
-      pass: "OwnerNemo2026!",
-      role: "owner",
-      color: "bg-purple-50 text-purple-700 border-purple-200",
-    },
-  ];
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 py-8 sm:py-12 bg-slate-50/50">
@@ -305,42 +269,6 @@ export default function LoginPage() {
             </Link>
           </div>
         </Card>
-
-        {/* Quick Fill Dropdown (Reviewer Convenience with Real Passwords) */}
-        <div className="rounded-xl border border-slate-200 bg-white/80 backdrop-blur-xs p-3">
-          <button
-            type="button"
-            onClick={() => setShowQuickFill(!showQuickFill)}
-            className="w-full flex items-center justify-between text-xs text-slate-500 hover:text-slate-800 transition font-medium"
-          >
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              Isi Cepat Akun Demo (Pengujian Kredensial Riil)
-            </span>
-            <ChevronDown
-              className={`w-3.5 h-3.5 transition-transform ${showQuickFill ? "rotate-180" : ""}`}
-            />
-          </button>
-
-          {showQuickFill && (
-            <div className="mt-3 pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-2 animate-fade-in">
-              {quickFillAccounts.map((acc) => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => {
-                    setEmail(acc.email);
-                    setPassword(acc.pass);
-                  }}
-                  className={`p-2.5 rounded-lg border text-left text-xs transition hover:shadow-xs ${acc.color}`}
-                >
-                  <p className="font-semibold">{acc.label}</p>
-                  <p className="text-[11px] opacity-80 font-mono truncate">{acc.email}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

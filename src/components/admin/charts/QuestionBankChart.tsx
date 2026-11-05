@@ -273,3 +273,5 @@ export const QuestionBankChart: React.FC<QuestionBankChartProps> = ({
     </div>
   );
 };
+
+export default QuestionBankChart;

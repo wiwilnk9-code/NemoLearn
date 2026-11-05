@@ -339,3 +339,5 @@ export const AiRoutingConfigModal: React.FC<AiRoutingConfigModalProps> = ({
     </div>
   );
 };
+
+export default AiRoutingConfigModal;

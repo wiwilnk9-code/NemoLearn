@@ -17,11 +17,13 @@ import {
   AlertCircle,
   HelpCircle,
 } from "lucide-react";
-import { UserGrowthChart } from "@/components/admin/charts/UserGrowthChart";
-import { PlatformActivityChart } from "@/components/admin/charts/PlatformActivityChart";
-import { AIUsageAnalyticsChart } from "@/components/admin/charts/AIUsageAnalyticsChart";
-import { QuestionBankChart } from "@/components/admin/charts/QuestionBankChart";
-import { ScoreDistributionChart } from "@/components/admin/charts/ScoreDistributionChart";
+import {
+  UserGrowthChart,
+  PlatformActivityChart,
+  AIUsageAnalyticsChart,
+  QuestionBankChart,
+  ScoreDistributionChart,
+} from "@/components/admin/charts";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";

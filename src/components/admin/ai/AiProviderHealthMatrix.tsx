@@ -244,3 +244,5 @@ export const AiProviderHealthMatrix: React.FC<AiProviderHealthMatrixProps> = ({
     </div>
   );
 };
+
+export default AiProviderHealthMatrix;

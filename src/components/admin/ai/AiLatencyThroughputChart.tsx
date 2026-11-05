@@ -303,3 +303,5 @@ export const AiLatencyThroughputChart: React.FC<AiLatencyThroughputChartProps> =
     </div>
   );
 };
+
+export default AiLatencyThroughputChart;

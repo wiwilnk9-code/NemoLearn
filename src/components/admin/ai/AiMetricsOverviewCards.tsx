@@ -229,3 +229,5 @@ export const AiMetricsOverviewCards: React.FC<AiMetricsOverviewCardsProps> = ({ 
     </div>
   );
 };
+
+export default AiMetricsOverviewCards;

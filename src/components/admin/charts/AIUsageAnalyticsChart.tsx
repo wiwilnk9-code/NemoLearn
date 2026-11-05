@@ -361,3 +361,5 @@ export const AIUsageAnalyticsChart: React.FC<AIUsageAnalyticsChartProps> = ({
     </div>
   );
 };
+
+export default AIUsageAnalyticsChart;

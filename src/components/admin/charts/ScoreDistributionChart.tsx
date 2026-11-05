@@ -351,3 +351,5 @@ export const ScoreDistributionChart: React.FC<ScoreDistributionChartProps> = ({
     </div>
   );
 };
+
+export default ScoreDistributionChart;

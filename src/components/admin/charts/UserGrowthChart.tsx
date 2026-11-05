@@ -277,3 +277,5 @@ export const UserGrowthChart: React.FC<UserGrowthChartProps> = ({
     </div>
   );
 };
+
+export default UserGrowthChart;

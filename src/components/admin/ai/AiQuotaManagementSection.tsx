@@ -874,3 +874,5 @@ export const AiQuotaManagementSection: React.FC<Props> = ({ currentUser, onToast
     </div>
   );
 };
+
+export default AiQuotaManagementSection;

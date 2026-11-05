@@ -256,3 +256,5 @@ export const AiRequestStreamTable: React.FC<AiRequestStreamTableProps> = ({
     </div>
   );
 };
+
+export default AiRequestStreamTable;

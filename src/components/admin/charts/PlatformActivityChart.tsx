@@ -309,3 +309,5 @@ export const PlatformActivityChart: React.FC<PlatformActivityChartProps> = ({
     </div>
   );
 };
+
+export default PlatformActivityChart;

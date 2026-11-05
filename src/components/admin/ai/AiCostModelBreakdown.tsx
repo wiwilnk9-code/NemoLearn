@@ -116,3 +116,5 @@ export const AiCostModelBreakdown: React.FC<AiCostModelBreakdownProps> = ({
     </div>
   );
 };
+
+export default AiCostModelBreakdown;

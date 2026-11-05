@@ -142,3 +142,5 @@ export const AiPayloadInspectorModal: React.FC<AiPayloadInspectorModalProps> = (
     </div>
   );
 };
+
+export default AiPayloadInspectorModal;

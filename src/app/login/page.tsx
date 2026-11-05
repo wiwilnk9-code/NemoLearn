@@ -20,7 +20,7 @@ import {
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { clientLogin } from "@/lib/auth/client";
+import { clientLogin, clientSignInWithGoogle } from "@/lib/auth/client";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -37,6 +37,20 @@ export default function LoginPage() {
       const params = new URLSearchParams(window.location.search);
       if (params.get("deleted") === "true") {
         setDeletedMsg(true);
+      }
+      const err = params.get("error");
+      if (err) {
+        if (err === "cancelled" || err === "access_denied") {
+          setErrorMessage("Autentikasi Google dibatalkan oleh pengguna.");
+        } else if (err === "redirect_mismatch" || err.toLowerCase().includes("redirect_uri_mismatch")) {
+          setErrorMessage("Konfigurasi URL callback Google OAuth belum sesuai. Pastikan redirect URI Supabase telah ditambahkan di Google Cloud Console.");
+        } else if (err === "provider_disabled") {
+          setErrorMessage("Google OAuth provider belum diaktifkan di Supabase Dashboard. Hubungi Administrator platform.");
+        } else if (err === "suspended") {
+          setErrorMessage("Akun ini telah dinonaktifkan (suspended) oleh Administrator.");
+        } else {
+          setErrorMessage(decodeURIComponent(err));
+        }
       }
     }
   }, []);
@@ -78,18 +92,33 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
+    setErrorMessage(null);
     try {
-      const res = await fetch("/api/auth/oauth/google");
-      const data = await res.json();
-      if (!data.isConfigured) {
-        setErrorMessage(data.message || "Google OAuth belum dikonfigurasi.");
+      const res = await clientSignInWithGoogle();
+      if (!res.success) {
+        const msg = res.error || "";
+        if (
+          msg.toLowerCase().includes("not enabled") ||
+          msg.toLowerCase().includes("unsupported provider") ||
+          msg.toLowerCase().includes("validation_failed")
+        ) {
+          setErrorMessage(
+            "Google OAuth belum diaktifkan di Supabase Dashboard. Silakan hubungi Administrator atau gunakan login Email & Kata Sandi."
+          );
+        } else {
+          setErrorMessage(res.error || "Gagal menghubungkan ke layanan Google OAuth.");
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      if (res.url) {
+        window.location.href = res.url;
       } else {
-        // Jika dikonfigurasi, redirect ke provider
-        window.location.href = "/api/auth/oauth/google";
+        setIsLoading(false);
       }
     } catch (err: any) {
-      setErrorMessage("Gagal menghubungkan ke layanan Google OAuth.");
-    } finally {
+      setErrorMessage(err?.message || "Gagal menghubungkan ke layanan Google OAuth.");
       setIsLoading(false);
     }
   };

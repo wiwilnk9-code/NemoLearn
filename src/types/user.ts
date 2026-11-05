@@ -100,6 +100,7 @@ export interface User {
   privacyVersion?: string;
   parentalConsentConfirmed?: boolean;
   authProvider?: "email" | "google" | "supabase";
+  authProviderId?: string;
   // AI Access & Quota Control (Task 3)
   hasAiAccess?: boolean;
   dailyAiQuotaOverride?: number;

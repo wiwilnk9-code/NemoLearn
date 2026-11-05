@@ -29,6 +29,7 @@ export async function syncUserUpsert(u: User): Promise<void> {
   try {
     const { error } = await supabaseServer.from("users").upsert({
       id: u.id,
+      auth_provider_id: u.authProviderId || null,
       email: u.email,
       display_name: u.displayName,
       role: u.role,

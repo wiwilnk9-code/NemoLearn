@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { COOKIE_NAME, getCurrentUser } from "@/lib/auth/server";
 import { SystemLogRepository } from "@/lib/db";
+import { supabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +21,27 @@ export async function POST(req: Request) {
       });
     }
 
+    // Revoke Supabase server session if applicable
+    if (process.env.NODE_ENV !== "test") {
+      try {
+        await supabaseServer.auth.signOut();
+      } catch {}
+    }
+
     const response = NextResponse.json({ success: true, message: "Berhasil keluar dari sesi." });
+    
+    // Clear application session cookie
     response.cookies.delete(COOKIE_NAME);
+    
+    // Clear any Supabase auth cookies
+    const cookieHeader = req.headers.get("cookie") || "";
+    cookieHeader.split(";").forEach((part) => {
+      const [name] = part.trim().split("=");
+      if (name && (name.startsWith("sb-") || name.includes("auth-token") || name.includes("supabase"))) {
+        response.cookies.delete(name);
+      }
+    });
+
     response.cookies.set({
       name: "nemo_logged_out",
       value: "1",

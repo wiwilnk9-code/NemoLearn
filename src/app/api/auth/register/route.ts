@@ -7,6 +7,7 @@ import {
   sanitizeUserOutput,
 } from "@/lib/auth/password";
 import { User } from "@/types/user";
+import { supabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -95,11 +96,45 @@ export async function POST(req: Request) {
       );
     }
 
-    // 5. Aturan Keamanan Peran: Registrasi publik SELALU menghasilkan role 'pelajar'
-    // Mencegah privilege escalation (frontend mengirim role admin/owner)
+    // 5. Aturan Keamanan Peran: Registrasi publik SELALU menghasilkan role 'pelajar' (Student)
+    // Mencegah privilege escalation (frontend dilarang memilih admin/owner)
     const secureRole = "pelajar";
 
-    const userId = `usr_reg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    // 6. Registrasi Supabase Auth (signUp)
+    let supabaseAuthId: string | undefined;
+    if (process.env.NODE_ENV !== "test") {
+      try {
+        const { data: sbAuth, error: sbError } = await supabaseServer.auth.signUp({
+          email: trimmedEmail,
+          password,
+          options: {
+            data: {
+              display_name: displayName.trim(),
+              role: secureRole,
+              school: school ? String(school).trim() : null,
+              gender: gender || "rahasia",
+            },
+          },
+        });
+
+        if (sbError) {
+          const errMsg = sbError.message?.toLowerCase() || "";
+          if (errMsg.includes("already registered") || errMsg.includes("user already exists") || sbError.status === 422) {
+            return NextResponse.json(
+              { success: false, error: "Alamat email ini sudah terdaftar. Silakan masuk atau gunakan email lain." },
+              { status: 409 }
+            );
+          }
+          console.warn("[Register] Supabase signUp warning:", sbError.message);
+        } else if (sbAuth?.user) {
+          supabaseAuthId = sbAuth.user.id;
+        }
+      } catch (sbErr: any) {
+        console.warn("[Register] Supabase signUp exception:", sbErr?.message || sbErr);
+      }
+    }
+
+    const userId = supabaseAuthId || `usr_reg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const verificationToken = `tok_verif_${generateCryptoToken(24)}`;
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 jam
     const hashedPassword = hashPassword(password);
@@ -107,6 +142,7 @@ export async function POST(req: Request) {
 
     const newUser: User = {
       id: userId,
+      authProviderId: supabaseAuthId,
       email: trimmedEmail,
       displayName: displayName.trim(),
       role: secureRole,
@@ -129,7 +165,7 @@ export async function POST(req: Request) {
 
     UserRepository.create(newUser);
 
-    // 6. Rekam Jejak Audit Sistem
+    // 7. Rekam Jejak Audit Sistem
     SystemLogRepository.log({
       level: "info",
       action: "USER_REGISTER",
@@ -148,7 +184,7 @@ export async function POST(req: Request) {
         success: true,
         message: "Pendaftaran berhasil! Silakan periksa email Anda untuk memverifikasi akun.",
         user: sanitizeUserOutput(newUser),
-        verificationToken: process.env.NODE_ENV === "production" ? undefined : verificationToken, // Disembunyikan di produksi demi keamanan
+        verificationToken: process.env.NODE_ENV === "production" ? undefined : verificationToken,
       },
       { status: 201 }
     );

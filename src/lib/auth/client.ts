@@ -5,6 +5,7 @@
  */
 
 import { User } from "@/types/user";
+import { supabase } from "@/lib/supabase/client";
 export * from "./permissions";
 
 /**
@@ -33,7 +34,7 @@ export interface ClientLoginCredentials {
 }
 
 /**
- * Melakukan login akun secara client-side via /api/auth/login.
+ * Melakukan login akun secara client-side via Supabase Auth dan /api/auth/login.
  * Mendukung format email & password riil, serta userId (backward compatibility).
  */
 export async function clientLogin(
@@ -41,6 +42,19 @@ export async function clientLogin(
 ): Promise<{ success: boolean; user?: User; error?: string; emailVerified?: boolean }> {
   try {
     const payload = typeof credentials === "string" ? { userId: credentials } : credentials;
+
+    // Sinkronisasi sesi Supabase Auth client di browser
+    if (payload.email && payload.password) {
+      try {
+        await supabase.auth.signInWithPassword({
+          email: payload.email,
+          password: payload.password,
+        });
+      } catch (sbErr) {
+        // Fallback untuk offline/seed users
+      }
+    }
+
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -75,6 +89,22 @@ export async function clientRegister(
   data: ClientRegisterData
 ): Promise<{ success: boolean; message?: string; error?: string; user?: User; verificationToken?: string }> {
   try {
+    // Sinkronisasi Supabase Auth client jika tersedia
+    try {
+      await supabase.auth.signUp({
+        email: data.email.trim().toLowerCase(),
+        password: data.password,
+        options: {
+          data: {
+            display_name: data.displayName.trim(),
+            role: "pelajar",
+            school: data.school,
+            gender: data.gender,
+          },
+        },
+      });
+    } catch {}
+
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -96,12 +126,56 @@ export async function clientRegister(
 }
 
 /**
+ * Menginisiasi alur autentikasi Google OAuth dengan PKCE
+ */
+export async function clientSignInWithGoogle(
+  redirectTo?: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const callbackUrl = redirectTo || `${origin}/auth/callback`;
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: callbackUrl,
+        scopes: "openid email profile",
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
+      },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    if (data?.url) {
+      return { success: true, url: data.url };
+    }
+
+    return { success: false, error: "Tidak menerima URL pengalihan dari provider OAuth." };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Gagal menginisiasi Google OAuth." };
+  }
+}
+
+/**
  * Meminta tautan pemulihan kata sandi (Forgot Password).
  */
 export async function clientForgotPassword(
   email: string
 ): Promise<{ success: boolean; message?: string; error?: string; resetToken?: string }> {
   try {
+    // Juga picu resetPasswordForEmail Supabase Auth jika terdaftar
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: `${origin}/reset-password`,
+      });
+    } catch {}
+
     const res = await fetch("/api/auth/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -160,10 +234,15 @@ export async function clientVerifyEmail(
 }
 
 /**
- * Melakukan logout akun secara client-side via /api/auth/logout.
+ * Melakukan logout akun secara client-side via Supabase Auth dan /api/auth/logout.
  */
 export async function clientLogout(): Promise<boolean> {
   try {
+    // Bersihkan sesi Supabase client
+    try {
+      await supabase.auth.signOut();
+    } catch {}
+
     const res = await fetch("/api/auth/logout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

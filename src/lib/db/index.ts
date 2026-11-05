@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { User, UserRole, AdminPermission, DEFAULT_ADMIN_PERMISSIONS } from "@/types/user";
 import { Subject } from "@/types/subject";
 import { Question, QuestionFilterOptions, QuestionStats, ExplanationDepth, QuestionExplanation } from "@/types/question";
@@ -118,13 +119,20 @@ export interface DatabaseState {
   aiSettings?: AISettings;
 }
 
-const DB_FILE = process.env.DB_FILE || path.resolve(process.env.TEMP || "C:\\Users\\wilda", "nemoquiz_data.json");
+const DB_FILE = process.env.DB_FILE || path.resolve(process.env.TEMP || os.tmpdir(), "nemoquiz_data.json");
 
-// Ensure directory exists
+// Ensure directory exists in local development
 function ensureDataDir() {
-  const dir = path.dirname(DB_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (process.env.VERCEL || process.env.NODE_ENV === "production") {
+    return;
+  }
+  try {
+    const dir = path.dirname(DB_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  } catch (err) {
+    console.warn("[Database] ensureDataDir notice (in-memory mode):", err);
   }
 }
 
@@ -352,8 +360,18 @@ export function loadDb(): DatabaseState {
       });
   }
 
-  ensureDataDir();
-  if (fs.existsSync(DB_FILE)) {
+  if (!process.env.VERCEL && process.env.NODE_ENV !== "production") {
+    ensureDataDir();
+  }
+
+  let dbFileExists = false;
+  try {
+    dbFileExists = !process.env.VERCEL && fs.existsSync(DB_FILE);
+  } catch {
+    dbFileExists = false;
+  }
+
+  if (dbFileExists) {
     try {
       const content = fs.readFileSync(DB_FILE, "utf-8");
       memoryState = JSON.parse(content);

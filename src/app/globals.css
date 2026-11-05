@@ -1,0 +1,130 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+@import "katex/dist/katex.min.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --ground: #FAF9F5;
+    --surface: #FFFFFF;
+    --surface-subtle: #F3F4EE;
+    --border: #E5E7EB;
+    --border-hover: #CBD5E1;
+    --text-primary: #0F172A;
+    --text-secondary: #334155;
+    --text-muted: #64748B;
+    --brand-primary: #16A34A;
+    --brand-primary-hover: #15803D;
+    --brand-subtle: #F0FDF4;
+    --accent-coral: #EA580C;
+    --accent-coral-subtle: #FFF7ED;
+    --accent-lime: #84CC16;
+    --accent-lime-subtle: #F7FEE7;
+    --success: #16A34A;
+    --success-subtle: #F0FDF4;
+    --danger: #DC2626;
+    --danger-subtle: #FEF2F2;
+    --warning: #D97706;
+    --warning-subtle: #FFFBEB;
+    --info: #0284C7;
+    --info-subtle: #F0F9FF;
+  }
+
+  body {
+    @apply bg-[#FAF9F5] text-[#0F172A] min-h-screen antialiased selection:bg-[#DCFCE7] selection:text-[#15803D];
+    -webkit-tap-highlight-color: transparent;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Keyboard focus outline for accessibility */
+  :focus-visible {
+    @apply outline-none ring-2 ring-[#16A34A] ring-offset-2 ring-offset-white;
+  }
+}
+
+/* Modern Flat Elevation & Borders matching Anti-Slop Guidelines */
+.shadow-nemo-sm {
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+}
+
+.shadow-nemo-card {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+}
+
+.shadow-nemo-hover {
+  box-shadow: 0 6px 16px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -2px rgba(15, 23, 42, 0.04);
+}
+
+/* Academic & Editorial Typography Helpers */
+.editorial-heading {
+  @apply font-bold tracking-tight text-[#0F172A];
+}
+
+.ui-label {
+  @apply text-[11px] font-bold uppercase tracking-wider text-[#475569];
+}
+
+.metric-value {
+  @apply font-mono font-bold tracking-tight text-[#0F172A] tabular-nums;
+}
+
+/* Surface containers */
+.surface-card {
+  @apply bg-white border border-[#E2E8F0] rounded-xl shadow-sm transition-all;
+}
+
+.surface-hover {
+  @apply hover:border-[#CBD5E1] hover:shadow-hover transition-all;
+}
+
+/* Sapphire — Clean Analytics Light Design System Utilities */
+.sapphire-canvas {
+  background-color: #EEF3F9;
+  color: #101828;
+}
+
+.sapphire-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 6px rgba(16, 24, 40, 0.04), 0 1px 2px rgba(16, 24, 40, 0.02);
+}
+
+.sapphire-card-hover {
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sapphire-card-hover:hover {
+  background-color: #F8FAFC;
+  border-color: #CBD5E1;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.06), 0 2px 6px rgba(16, 24, 40, 0.03);
+}
+
+.sapphire-focus:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px #0B559F;
+}
+
+/* KaTeX custom sizing & overflow safety */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5rem 0;
+}
+
+.math-content {
+  word-break: break-word;
+}
+
+/* Animation utilities */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

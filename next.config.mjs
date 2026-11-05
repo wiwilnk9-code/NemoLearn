@@ -2,7 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  cleanDistDir: false,
+  cleanDistDir: true,
+  experimental: {
+    webpackBuildWorker: false,
+  },
   eslint: {
     // Ignore ESLint during builds to prevent non-interactive terminal prompt hangs
     ignoreDuringBuilds: true,

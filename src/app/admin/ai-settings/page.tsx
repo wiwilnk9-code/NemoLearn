@@ -6,28 +6,20 @@ import { AIProviderType } from "@/types/ai";
 import { AdminContentContainer } from "@/components/admin/AdminContentContainer";
 import { AdminConfirmDialog } from "@/components/admin/ui/AdminConfirmDialog";
 import { toast, AdminToastContainer } from "@/components/admin/ui/AdminToast";
-import { AiMetricsOverviewCards } from "@/components/admin/ai/AiMetricsOverviewCards";
 import {
+  AiMetricsOverviewCards,
   AiProviderHealthMatrix,
   ProviderHealthItem,
-} from "@/components/admin/ai/AiProviderHealthMatrix";
-import {
   AiLatencyThroughputChart,
   ThroughputPoint,
-} from "@/components/admin/ai/AiLatencyThroughputChart";
-import {
   AiCostModelBreakdown,
   ModelUsageBreakdownItem,
-} from "@/components/admin/ai/AiCostModelBreakdown";
-import {
   AiRequestStreamTable,
-} from "@/components/admin/ai/AiRequestStreamTable";
-import {
   AiPayloadInspectorModal,
   TelemetryPayloadItem,
-} from "@/components/admin/ai/AiPayloadInspectorModal";
-import { AiRoutingConfigModal } from "@/components/admin/ai/AiRoutingConfigModal";
-import { AiQuotaManagementSection } from "@/components/admin/ai/AiQuotaManagementSection";
+  AiRoutingConfigModal,
+  AiQuotaManagementSection,
+} from "@/components/admin/ai";
 import {
   Cpu,
   RefreshCw,

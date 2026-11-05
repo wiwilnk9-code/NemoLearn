@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node -r ./register-alias.js -r jiti/register --test src/**/*.test.ts"
+    "test": "node -r ./register-alias.js -r jiti/register --test src/**/*.test.ts",
+    "bootstrap:owner": "node scripts/bootstrap-owner.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

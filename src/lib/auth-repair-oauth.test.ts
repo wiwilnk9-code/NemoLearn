@@ -6,6 +6,7 @@ import { POST as logoutHandler } from "@/app/api/auth/logout/route";
 import { GET as oauthCallbackHandler } from "@/app/auth/callback/route";
 import { UserRepository, loadDb } from "@/lib/db";
 import { COOKIE_NAME, verifySessionToken, createSessionToken } from "@/lib/auth/server";
+import { hashPassword } from "@/lib/auth/password";
 import { User } from "@/types/user";
 
 describe("NEMOLEARN AUTHENTICATION REPAIR & GOOGLE OAUTH SUITE", () => {
@@ -80,7 +81,7 @@ describe("NEMOLEARN AUTHENTICATION REPAIR & GOOGLE OAUTH SUITE", () => {
     });
 
     it("menolak registrasi jika email sudah terdaftar sebelumnya (Anti-Duplikasi 409)", async () => {
-      // Pastikan akun uji ada di database
+      // Pastikan akun uji ada di database dengan password hash valid
       const existing = UserRepository.getByEmail("budi.santoso@siswa.sma.id");
       if (!existing) {
         UserRepository.create({
@@ -91,8 +92,18 @@ describe("NEMOLEARN AUTHENTICATION REPAIR & GOOGLE OAUTH SUITE", () => {
           status: "active",
           verificationStatus: "verified",
           emailVerified: true,
+          passwordHash: hashPassword("PelajarNemo2026!"),
           authProvider: "email",
           createdAt: new Date().toISOString(),
+        });
+      } else if (!existing.passwordHash) {
+        UserRepository.update(existing.id, {
+          displayName: "Budi Santoso",
+          passwordHash: hashPassword("PelajarNemo2026!"),
+        });
+      } else if (existing.displayName !== "Budi Santoso") {
+        UserRepository.update(existing.id, {
+          displayName: "Budi Santoso",
         });
       }
 

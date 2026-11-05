@@ -6,6 +6,7 @@
 
 import { User, UserRole, AdminPermission } from "@/types/user";
 import { UserRepository } from "@/lib/db";
+import { supabaseServer } from "@/lib/supabase/server";
 import { hasPermission } from "./permissions";
 import crypto from "crypto";
 import { cookies } from "next/headers";
@@ -130,7 +131,60 @@ export async function getCurrentUser(
     if (!payload) return null;
 
     // Verifikasi keberadaan dan keaktifan user langsung di database (server authoritative)
-    const user = UserRepository.getById(payload.userId);
+    let user = UserRepository.getById(payload.userId);
+
+    // Fallback: jika belum ada di cache memory (misal proses lambda baru), ambil langsung dari Supabase
+    if (!user && process.env.NODE_ENV !== "test") {
+      try {
+        const { data: row } = await supabaseServer
+          .from("users")
+          .select("*")
+          .eq("id", payload.userId)
+          .maybeSingle();
+
+        if (row) {
+          user = {
+            id: row.id,
+            authProviderId: row.auth_provider_id || undefined,
+            email: row.email,
+            displayName: row.display_name,
+            role: row.role,
+            school: row.school || undefined,
+            gender: row.gender || undefined,
+            avatarUrl: row.avatar_url || undefined,
+            status: row.status,
+            verificationStatus: row.verification_status,
+            nuptk: row.nuptk || undefined,
+            subject: row.subject || undefined,
+            portfolioUrl: row.portfolio_url || undefined,
+            verificationNote: row.verification_note || undefined,
+            permissions: row.permissions || [],
+            passwordHash: row.password_hash || undefined,
+            emailVerified: Boolean(row.email_verified),
+            verificationToken: row.verification_token || undefined,
+            verificationTokenExpires: row.verification_token_expires || undefined,
+            resetPasswordToken: row.reset_password_token || undefined,
+            resetPasswordExpires: row.reset_password_expires || undefined,
+            tosAcceptedAt: row.tos_accepted_at || undefined,
+            privacyAcceptedAt: row.privacy_accepted_at || undefined,
+            tosVersion: row.tos_version || "2026.11",
+            privacyVersion: row.privacy_version || "2026.11",
+            parentalConsentConfirmed: Boolean(row.parental_consent),
+            authProvider: row.auth_provider || "email",
+            hasAiAccess: Boolean(row.has_ai_access),
+            dailyAiQuotaOverride: row.daily_ai_quota_override || undefined,
+            aiAccessGrantedBy: row.ai_access_granted_by || undefined,
+            aiAccessGrantedAt: row.ai_access_granted_at || undefined,
+            createdAt: row.created_at,
+            lastActiveAt: row.last_active_at,
+          };
+          UserRepository.create(user);
+        }
+      } catch (err) {
+        console.warn("[ServerAuth] Supabase direct user lookup fallback skipped:", err);
+      }
+    }
+
     if (!user || user.status !== "active") return null;
 
     return user;

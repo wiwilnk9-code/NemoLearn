@@ -165,6 +165,15 @@ export async function POST(req: Request) {
 
     UserRepository.create(newUser);
 
+    // Sinkronkan peran default ke app_metadata Supabase Auth
+    if (process.env.NODE_ENV !== "test" && supabaseAuthId) {
+      try {
+        await supabaseServer.auth.admin.updateUserById(supabaseAuthId, {
+          app_metadata: { role: secureRole },
+        });
+      } catch {}
+    }
+
     // 7. Rekam Jejak Audit Sistem
     SystemLogRepository.log({
       level: "info",

@@ -60,29 +60,69 @@ export async function POST(req: Request) {
 
           if (!authError && authData?.user) {
             authValidated = true;
-            // Jika user lokal belum ada (misal didaftarkan langsung via Supabase), inisialisasi user lokal
+            // Jika user lokal belum ada (misal proses lambda baru), cari di PostgreSQL atau inisialisasi
             if (!targetUser) {
-              const meta = authData.user.user_metadata || {};
-              const newUser: User = {
-                id: authData.user.id,
-                authProviderId: authData.user.id,
-                email: normalizedEmail,
-                displayName: meta.display_name || meta.name || normalizedEmail.split("@")[0],
-                role: "pelajar",
-                status: "active",
-                verificationStatus: "verified",
-                emailVerified: Boolean(authData.user.email_confirmed_at || authData.user.confirmed_at),
-                authProvider: "email",
-                createdAt: authData.user.created_at || new Date().toISOString(),
-                lastActiveAt: new Date().toISOString(),
-              };
-              targetUser = UserRepository.create(newUser);
+              const { data: dbUser } = await supabaseServer
+                .from("users")
+                .select("*")
+                .eq("email", normalizedEmail)
+                .maybeSingle();
+
+              if (dbUser) {
+                targetUser = {
+                  id: dbUser.id,
+                  authProviderId: dbUser.auth_provider_id || authData.user.id,
+                  email: dbUser.email,
+                  displayName: dbUser.display_name,
+                  role: dbUser.role,
+                  school: dbUser.school || undefined,
+                  gender: dbUser.gender || undefined,
+                  avatarUrl: dbUser.avatar_url || undefined,
+                  status: dbUser.status,
+                  verificationStatus: dbUser.verification_status,
+                  nuptk: dbUser.nuptk || undefined,
+                  subject: dbUser.subject || undefined,
+                  portfolioUrl: dbUser.portfolio_url || undefined,
+                  verificationNote: dbUser.verification_note || undefined,
+                  permissions: dbUser.permissions || [],
+                  passwordHash: dbUser.password_hash || undefined,
+                  emailVerified: Boolean(dbUser.email_verified || authData.user.email_confirmed_at),
+                  authProvider: dbUser.auth_provider || "email",
+                  createdAt: dbUser.created_at,
+                  lastActiveAt: new Date().toISOString(),
+                  tosVersion: dbUser.tos_version || "2026.11",
+                  privacyVersion: dbUser.privacy_version || "2026.11",
+                };
+                UserRepository.create(targetUser);
+              } else {
+                const meta = authData.user.user_metadata || {};
+                const newUser: User = {
+                  id: authData.user.id,
+                  authProviderId: authData.user.id,
+                  email: normalizedEmail,
+                  displayName: meta.display_name || meta.name || normalizedEmail.split("@")[0],
+                  role: "pelajar",
+                  status: "active",
+                  verificationStatus: "verified",
+                  emailVerified: Boolean(authData.user.email_confirmed_at || authData.user.confirmed_at),
+                  authProvider: "email",
+                  createdAt: authData.user.created_at || new Date().toISOString(),
+                  lastActiveAt: new Date().toISOString(),
+                };
+                targetUser = UserRepository.create(newUser);
+              }
             } else if (!targetUser.authProviderId) {
               UserRepository.update(targetUser.id, {
                 authProviderId: authData.user.id,
                 emailVerified: Boolean(authData.user.email_confirmed_at || authData.user.confirmed_at),
               });
             }
+
+            try {
+              await supabaseServer.auth.admin.updateUserById(authData.user.id, {
+                app_metadata: { role: targetUser.role },
+              });
+            } catch {}
           }
         } catch (sbErr) {
           console.warn("[Login] Supabase signInWithPassword exception:", sbErr);

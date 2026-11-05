@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -11,11 +11,36 @@ export async function GET(req: Request) {
   const redirectTo = `${appUrl}/auth/callback`;
 
   if (isDirect) {
-    const { data, error } = await supabaseServer.auth.signInWithOAuth({
+    const cookieQueue: Array<{ name: string; value: string; options: any }> = [];
+    const supabase = createServerSupabaseClient({
+      getAll() {
+        const cookieHeader = req.headers.get("cookie");
+        if (!cookieHeader) return [];
+        return cookieHeader
+          .split(";")
+          .map((part) => {
+            const [rawKey, ...rawVal] = part.trim().split("=");
+            return {
+              name: decodeURIComponent(rawKey || ""),
+              value: decodeURIComponent(rawVal.join("=") || ""),
+            };
+          })
+          .filter((c) => Boolean(c.name));
+      },
+      setAll(cookiesToSet) {
+        cookieQueue.push(...cookiesToSet);
+      },
+    });
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo,
         scopes: "openid email profile",
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
       },
     });
 
@@ -25,7 +50,11 @@ export async function GET(req: Request) {
       );
     }
 
-    return NextResponse.redirect(data.url);
+    const res = NextResponse.redirect(data.url);
+    cookieQueue.forEach(({ name, value, options }) => {
+      res.cookies.set(name, value, options);
+    });
+    return res;
   }
 
   const isGoogleConfigured = Boolean(

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, supabaseServer } from "@/lib/supabase/server";
 import { UserRepository, SystemLogRepository } from "@/lib/db";
 import { createSessionToken, COOKIE_NAME, SESSION_MAX_AGE } from "@/lib/auth/server";
 import { User } from "@/types/user";
@@ -112,6 +112,47 @@ export async function GET(req: Request) {
 
     let targetUser: User | null = UserRepository.getByEmail(normalizedEmail);
 
+    // Jika belum ditemukan di cache in-memory, periksa langsung ke database Supabase PostgreSQL
+    if (!targetUser && process.env.NODE_ENV !== "test") {
+      try {
+        const { data: dbUser } = await supabaseServer
+          .from("users")
+          .select("*")
+          .eq("email", normalizedEmail)
+          .maybeSingle();
+
+        if (dbUser) {
+          targetUser = {
+            id: dbUser.id,
+            authProviderId: dbUser.auth_provider_id || authUser.id,
+            email: dbUser.email,
+            displayName: dbUser.display_name,
+            role: dbUser.role,
+            school: dbUser.school || undefined,
+            gender: dbUser.gender || undefined,
+            avatarUrl: dbUser.avatar_url || undefined,
+            status: dbUser.status,
+            verificationStatus: dbUser.verification_status,
+            nuptk: dbUser.nuptk || undefined,
+            subject: dbUser.subject || undefined,
+            portfolioUrl: dbUser.portfolio_url || undefined,
+            verificationNote: dbUser.verification_note || undefined,
+            permissions: dbUser.permissions || [],
+            passwordHash: dbUser.password_hash || undefined,
+            emailVerified: Boolean(dbUser.email_verified),
+            authProvider: dbUser.auth_provider || "google",
+            createdAt: dbUser.created_at,
+            lastActiveAt: new Date().toISOString(),
+            tosVersion: dbUser.tos_version || "2026.11",
+            privacyVersion: dbUser.privacy_version || "2026.11",
+          };
+          UserRepository.create(targetUser);
+        }
+      } catch (dbErr) {
+        console.warn("[OAuth Callback] Supabase PostgreSQL direct lookup fallback:", dbErr);
+      }
+    }
+
     // 4. Perilaku Account Linking:
     // Jika email Google sudah terdaftar, tautkan ID auth tanpa membuat akun ganda
     if (targetUser) {
@@ -184,6 +225,17 @@ export async function GET(req: Request) {
         details: `Pengguna baru mendaftar via Google OAuth (${targetUser.email}) dengan peran default '${defaultRole}'.`,
         status: "SUKSES",
       });
+    }
+
+    // Sinkronkan peran ke app_metadata Supabase Auth (Otorisasi Server-Side & RLS)
+    if (process.env.NODE_ENV !== "test") {
+      try {
+        await supabaseServer.auth.admin.updateUserById(authUser.id, {
+          app_metadata: { role: targetUser.role },
+        });
+      } catch (metaErr) {
+        // Fallback jika service role admin belum aktif
+      }
     }
 
     // 6. Terbitkan Token Sesi Kriptografis HMAC SHA-256

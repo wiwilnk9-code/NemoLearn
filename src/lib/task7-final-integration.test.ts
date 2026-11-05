@@ -687,6 +687,9 @@ describe("TASK 7: NEMOLEARN FINAL INTEGRATION TESTING & RELEASE CANDIDATE", () =
       // Verifikasi bahwa role di database tetap 'pelajar'
       const freshUser = UserRepository.getById(studentUser.id)!;
       assert.strictEqual(freshUser.role, "pelajar", "Role tidak berubah meski diminta klien");
+
+      // Pulihkan nama asli siswa agar pengujian lain tidak terganggu
+      UserRepository.update(studentUser.id, { displayName: "Budi Santoso" });
     });
 
     it("6.2. Endpoint administratif menolak pengguna dengan peran pelajar (403 Forbidden)", async () => {

@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     const { provider, apiKey, model, baseUrl, timeoutMs } = body;
 
     // 2. Validasi Provider
-    const validProviders: AIProviderType[] = ["gemini", "openai", "openai-compatible", "mock"];
+    const validProviders: AIProviderType[] = ["gemini", "openai", "openrouter", "openai-compatible", "mock"];
     if (!validProviders.includes(provider)) {
       return NextResponse.json(
         { error: `Provider '${provider}' tidak valid. Pilihan yang didukung: ${validProviders.join(", ")}` },
@@ -57,10 +57,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. SSRF Protection untuk Base URL jika OpenAI-compatible
+    // 3. SSRF Protection untuk Base URL jika OpenAI / OpenRouter / Compatible
     let safeBaseUrl: string | undefined = undefined;
-    if (provider === "openai-compatible" || (provider === "openai" && baseUrl)) {
-      safeBaseUrl = validateSafeBaseUrl(baseUrl);
+    if (provider === "openrouter" || provider === "openai-compatible" || (provider === "openai" && baseUrl)) {
+      safeBaseUrl = validateSafeBaseUrl(baseUrl || (provider === "openrouter" ? "https://openrouter.ai/api/v1" : undefined));
     }
 
     const current = getActiveAISettings();

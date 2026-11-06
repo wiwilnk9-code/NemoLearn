@@ -7,6 +7,9 @@ import {
   UserRepository,
   AIMetricsRepository,
   SystemLogRepository,
+  WebsiteSettingsRepository,
+  syncQuestionBatchUpsert,
+  syncSessionUpsert,
 } from "@/lib/db";
 import { getAIProvider } from "@/lib/ai";
 import { MockAIProvider } from "@/lib/ai/mock";
@@ -74,6 +77,24 @@ export async function POST(req: Request) {
           requestId,
         },
         { status: 403 }
+      );
+    }
+
+    // Task 5: Maintenance Mode Guard (Owner/Admin bypass allowed)
+    const websiteSettings = WebsiteSettingsRepository.get();
+    if (
+      websiteSettings?.maintenanceMode &&
+      user.role !== "owner" &&
+      user.role !== "admin"
+    ) {
+      return NextResponse.json(
+        {
+          error: "MAINTENANCE_MODE: Sistem sedang dalam mode pemeliharaan. Fitur pembuatan latihan soal sementara dinonaktifkan.",
+          code: "MAINTENANCE_MODE",
+          requestId,
+          maintenance: websiteSettings.maintenance,
+        },
+        { status: 503 }
       );
     }
 
@@ -403,8 +424,9 @@ export async function POST(req: Request) {
       details: `[${requestId}] Berhasil membuat ${generatedQuestions.length} butir soal (${validMode.toUpperCase()}) untuk ${subject.name} - ${topic.name} dalam ${latencyMs}ms. Provider: ${provider.name}${isFallback ? ` (Mode: Fallback/Bank Soal - ${fallbackReason})` : ""}.`,
     });
 
-    // Save questions in Database
+    // Save questions in Database & await Supabase sync to eliminate serverless race conditions
     QuestionRepository.saveBatch(generatedQuestions);
+    await syncQuestionBatchUpsert(generatedQuestions);
 
     // Confirm AI quota usage upon successfully generated questions (Task 3)
     if (reservation && reservation.success) {
@@ -440,6 +462,7 @@ export async function POST(req: Request) {
     };
 
     SessionRepository.create(newSession);
+    await syncSessionUpsert(newSession);
 
     return NextResponse.json({
       success: true,

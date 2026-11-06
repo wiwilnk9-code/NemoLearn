@@ -8,6 +8,7 @@ import {
   getGovernanceAuditLogs,
 } from "@/lib/db";
 import { WebsiteSettings } from "@/types/settings";
+import { broadcastRealtimeEvent } from "@/lib/realtime/broadcast";
 
 export const dynamic = "force-dynamic";
 
@@ -185,6 +186,11 @@ export async function POST(req: Request) {
     if (body.maintenance !== undefined) {
       actionName = body.maintenance.enabled ? "MAINTENANCE_LOCKDOWN_ENABLED" : "MAINTENANCE_LOCKDOWN_DISABLED";
       detailMsg = `Status Mode Pemeliharaan diubah ke [${body.maintenance.enabled ? "AKTIF" : "NONAKTIF"}] oleh ${admin.email} (Cakupan: ${body.maintenance.scope || "all"})`;
+      // Real-time broadcast to all clients
+      broadcastRealtimeEvent("nemo-maintenance", "MAINTENANCE_TOGGLED", {
+        maintenanceMode: updated.maintenanceMode,
+        maintenance: updated.maintenance,
+      });
     } else if (body.broadcast !== undefined) {
       actionName = body.broadcast.active ? "BROADCAST_PUBLISHED" : "BROADCAST_WITHDRAWN";
       detailMsg = `Banner pengumuman global [${body.broadcast.active ? "DITERBITKAN" : "DITARIK"}] oleh ${admin.email}`;

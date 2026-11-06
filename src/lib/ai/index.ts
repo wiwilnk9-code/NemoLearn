@@ -1,6 +1,7 @@
 import { AIProvider, AISettings, AIProviderType } from "@/types/ai";
 import { GeminiAIProvider } from "./gemini";
 import { OpenAIProvider } from "./openai";
+import { OpenRouterProvider } from "./openrouter";
 import { MockAIProvider } from "./mock";
 import { AISettingsRepository } from "@/lib/db";
 
@@ -46,8 +47,12 @@ export function getActiveAISettings(): {
     envProvider = "gemini";
   } else if (envProviderRaw === "openai") {
     envProvider = "openai";
-  } else if (envProviderRaw === "openai-compatible" || envProviderRaw === "openrouter" || envProviderRaw === "groq") {
+  } else if (envProviderRaw === "openrouter") {
+    envProvider = "openrouter";
+  } else if (envProviderRaw === "openai-compatible" || envProviderRaw === "groq") {
     envProvider = "openai-compatible";
+  } else if (process.env.OPENROUTER_API_KEY) {
+    envProvider = "openrouter";
   } else if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
     envProvider = "gemini";
   } else if (process.env.OPENAI_API_KEY) {
@@ -59,12 +64,16 @@ export function getActiveAISettings(): {
   let envModel = getDefaultModel(envProvider);
   if (envProvider === "gemini") {
     envModel = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+  } else if (envProvider === "openrouter") {
+    envModel = process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct";
   } else if (envProvider === "openai" || envProvider === "openai-compatible") {
     envModel = process.env.OPENAI_MODEL || (envProvider === "openai" ? "gpt-4o-mini" : "llama-3.3-70b-versatile");
   }
 
   const envBaseUrl =
-    envProvider === "openai-compatible" || envProvider === "openai"
+    envProvider === "openrouter"
+      ? process.env.OPENROUTER_BASE_URL || getDefaultBaseUrl(envProvider)
+      : envProvider === "openai-compatible" || envProvider === "openai"
       ? process.env.OPENAI_BASE_URL || getDefaultBaseUrl(envProvider)
       : undefined;
 
@@ -87,6 +96,9 @@ export function getEnvApiKey(provider: AIProviderType): string {
   if (provider === "openai") {
     return (process.env.OPENAI_API_KEY || "").trim();
   }
+  if (provider === "openrouter") {
+    return (process.env.OPENROUTER_API_KEY || "").trim();
+  }
   if (provider === "openai-compatible") {
     return (
       process.env.OPENAI_API_KEY ||
@@ -104,6 +116,8 @@ export function getDefaultModel(provider: AIProviderType): string {
       return "gemini-1.5-flash";
     case "openai":
       return "gpt-4o-mini";
+    case "openrouter":
+      return "meta-llama/llama-3.3-70b-instruct";
     case "openai-compatible":
       return "llama-3.3-70b-versatile";
     default:
@@ -113,6 +127,7 @@ export function getDefaultModel(provider: AIProviderType): string {
 
 export function getDefaultBaseUrl(provider: AIProviderType): string | undefined {
   if (provider === "openai") return "https://api.openai.com/v1";
+  if (provider === "openrouter") return "https://openrouter.ai/api/v1";
   if (provider === "openai-compatible") return "https://api.groq.com/openai/v1";
   return undefined;
 }
@@ -142,6 +157,8 @@ export function getAIProvider(override?: Partial<AISettings>): AIProvider {
       return new GeminiAIProvider(apiKey, model, timeoutMs);
     case "openai":
       return new OpenAIProvider(apiKey, model, baseUrl, timeoutMs, "openai");
+    case "openrouter":
+      return new OpenRouterProvider(apiKey, model, baseUrl, timeoutMs);
     case "openai-compatible":
       return new OpenAIProvider(apiKey, model, baseUrl, timeoutMs, "openai-compatible");
     case "mock":

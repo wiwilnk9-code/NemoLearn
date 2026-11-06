@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { SoundToggle } from "@/components/SoundToggle";
+import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 
 export const Sidebar: React.FC = () => {
@@ -146,6 +147,7 @@ export const Sidebar: React.FC = () => {
         </Link>
 
         <div className="flex items-center gap-2">
+          {currentUser && <NotificationBell userId={currentUser.id} />}
           <SoundToggle />
           {currentUser ? (
             <button
@@ -381,8 +383,11 @@ export const Sidebar: React.FC = () => {
           {/* User Profile & Role Switcher Footer */}
           <div className="p-3 border-t border-[#E5E7EB] bg-[#FAF9F5] space-y-2">
             <div className="flex items-center justify-between px-1">
-              <span className="text-[11px] font-medium text-[#64748B]">Efek Audio</span>
-              <SoundToggle popoverPlacement="top" />
+              <span className="text-[11px] font-medium text-[#64748B]">Notifikasi & Audio</span>
+              <div className="flex items-center gap-1.5">
+                {currentUser && <NotificationBell userId={currentUser.id} />}
+                <SoundToggle popoverPlacement="top" />
+              </div>
             </div>
             {currentUser ? (
               <div className="relative">

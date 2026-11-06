@@ -83,6 +83,9 @@ export const AiRoutingConfigModal: React.FC<AiRoutingConfigModalProps> = ({
     } else if (newProvider === "openai") {
       setModel("gpt-4o-mini");
       setBaseUrl("https://api.openai.com/v1");
+    } else if (newProvider === "openrouter") {
+      setModel("meta-llama/llama-3.3-70b-instruct");
+      setBaseUrl("https://openrouter.ai/api/v1");
     } else if (newProvider === "openai-compatible") {
       setModel("llama-3.3-70b-versatile");
       setBaseUrl("https://api.groq.com/openai/v1");
@@ -165,11 +168,12 @@ export const AiRoutingConfigModal: React.FC<AiRoutingConfigModalProps> = ({
           <label className="text-xs font-mono font-medium text-[#475467] uppercase">
             Pilih Provider Utama
           </label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {[
               { id: "gemini" as AIProviderType, name: "Google Gemini", icon: Sparkles },
               { id: "openai" as AIProviderType, name: "OpenAI", icon: Zap },
-              { id: "openai-compatible" as AIProviderType, name: "Groq / Router", icon: Globe },
+              { id: "openrouter" as AIProviderType, name: "OpenRouter", icon: Globe },
+              { id: "openai-compatible" as AIProviderType, name: "Groq / Other", icon: Globe },
               { id: "mock" as AIProviderType, name: "Nemo Local Bank", icon: Database },
             ].map((p) => {
               const Icon = p.icon;

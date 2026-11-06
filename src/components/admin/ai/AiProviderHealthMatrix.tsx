@@ -76,6 +76,8 @@ export const AiProviderHealthMatrix: React.FC<AiProviderHealthMatrixProps> = ({
         return <Sparkles className="w-4 h-4 text-[#0B559F]" />;
       case "OA":
         return <Zap className="w-4 h-4 text-[#53389E]" />;
+      case "OR":
+        return <Globe className="w-4 h-4 text-[#7957E8]" />;
       case "GW":
         return <Globe className="w-4 h-4 text-[#0FA97A]" />;
       case "NM":

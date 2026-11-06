@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/auth";
 import { getActiveAISettings } from "@/lib/ai";
 import { GeminiAIProvider } from "@/lib/ai/gemini";
 import { OpenAIProvider, validateSafeBaseUrl } from "@/lib/ai/openai";
+import { OpenRouterProvider } from "@/lib/ai/openrouter";
 import { MockAIProvider } from "@/lib/ai/mock";
 import { AIProvider, AIProviderType } from "@/types/ai";
 import { AISettingsRepository, AIMetricsRepository } from "@/lib/db";
@@ -34,11 +35,12 @@ export async function POST(req: Request) {
         (active.provider === providerType ? active.apiKey : "") ||
         (providerType === "gemini" ? process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY : "") ||
         (providerType === "openai" ? process.env.OPENAI_API_KEY : "") ||
+        (providerType === "openrouter" ? process.env.OPENROUTER_API_KEY : "") ||
         (providerType === "openai-compatible" ? process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY : "") ||
         "";
     }
 
-    const model = body.model || (providerType === "gemini" ? "gemini-1.5-flash" : providerType === "openai" ? "gpt-4o-mini" : "llama-3.3-70b-versatile");
+    const model = body.model || (providerType === "gemini" ? "gemini-1.5-flash" : providerType === "openrouter" ? "meta-llama/llama-3.3-70b-instruct" : providerType === "openai" ? "gpt-4o-mini" : "llama-3.3-70b-versatile");
     const timeoutMs = Math.min(15000, Math.max(3000, Number(body.timeoutMs) || 10000));
 
     let testProvider: AIProvider;
@@ -56,6 +58,24 @@ export async function POST(req: Request) {
         );
       }
       testProvider = new GeminiAIProvider(apiKey.trim(), model, timeoutMs);
+    } else if (providerType === "openrouter") {
+      if (!apiKey || !apiKey.trim()) {
+        return NextResponse.json(
+          {
+            success: false,
+            provider: "OpenRouter Unified Gateway",
+            errorType: "CONFIG_MISSING",
+            message: "API Key untuk OpenRouter belum diset. Konfigurasikan API Key terlebih dahulu.",
+          },
+          { status: 400 }
+        );
+      }
+      testProvider = new OpenRouterProvider(
+        apiKey.trim(),
+        model,
+        body.baseUrl || "https://openrouter.ai/api/v1",
+        timeoutMs
+      );
     } else if (providerType === "openai" || providerType === "openai-compatible") {
       if (!apiKey || !apiKey.trim()) {
         return NextResponse.json(

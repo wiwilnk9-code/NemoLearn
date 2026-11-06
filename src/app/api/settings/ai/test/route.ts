@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/auth";
 import { getActiveAISettings } from "@/lib/ai";
 import { GeminiAIProvider } from "@/lib/ai/gemini";
 import { OpenAIProvider, validateSafeBaseUrl } from "@/lib/ai/openai";
+import { OpenRouterProvider } from "@/lib/ai/openrouter";
 import { MockAIProvider } from "@/lib/ai/mock";
 import { AIProvider, AIProviderType } from "@/types/ai";
 
@@ -47,6 +48,24 @@ export async function POST(req: Request) {
         );
       }
       testProvider = new GeminiAIProvider(targetKey.trim(), targetModel, targetTimeout);
+    } else if (targetProvider === "openrouter") {
+      if (!targetKey || !targetKey.trim()) {
+        return NextResponse.json(
+          {
+            success: false,
+            provider: "openrouter",
+            errorType: "CONFIG_MISSING",
+            message: "API Key untuk OpenRouter belum diisi. Masukkan API Key sebelum menguji koneksi.",
+          },
+          { status: 400 }
+        );
+      }
+      testProvider = new OpenRouterProvider(
+        targetKey.trim(),
+        targetModel,
+        baseUrl || "https://openrouter.ai/api/v1",
+        targetTimeout
+      );
     } else if (targetProvider === "openai" || targetProvider === "openai-compatible") {
       if (!targetKey || !targetKey.trim()) {
         return NextResponse.json(

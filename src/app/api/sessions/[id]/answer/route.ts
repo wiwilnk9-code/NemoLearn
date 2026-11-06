@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { SessionRepository, ResponseRepository, QuestionRepository, UserRepository } from "@/lib/db";
+import { SessionRepository, ResponseRepository, QuestionRepository, UserRepository, syncResponseUpsert } from "@/lib/db";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -13,7 +13,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       );
     }
 
-    const session = SessionRepository.getById(sessionId);
+    const session = await SessionRepository.getByIdAsync(sessionId);
     if (!session) {
       return NextResponse.json({ error: "Sesi tidak ditemukan." }, { status: 404 });
     }
@@ -41,14 +41,20 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         ? (selectedAnswer as "A" | "B" | "C" | "D" | "E")
         : null;
 
-    // Idempotent save
+    // Idempotent save & await Supabase sync
     const record = ResponseRepository.saveAnswer(sessionId, questionId, validAnswer);
+    await syncResponseUpsert(record);
 
     // STAGE 2: MODE BELAJAR vs MODE UJIAN
     if (session.config.learningMode === "belajar") {
-      const question = QuestionRepository.getById(questionId);
+      const questions = await QuestionRepository.getByIdsAsync([questionId]);
+      const question = questions[0] || QuestionRepository.getById(questionId);
       const isCorrect = Boolean(validAnswer && question && validAnswer === question.correctAnswer);
       ResponseRepository.markEvaluated(sessionId, questionId, isCorrect);
+      await syncResponseUpsert({
+        ...record,
+        isCorrect,
+      });
 
       return NextResponse.json({
         success: true,

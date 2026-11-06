@@ -23,6 +23,7 @@ import {
   Award,
   Zap,
   Clock,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -62,36 +63,50 @@ export default function PracticeRoomPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingAnswer, setIsSavingAnswer] = useState(false);
 
-  // Load session data
-  useEffect(() => {
-    fetch(`/api/sessions/${sessionId}`)
-      .then(async (res) => {
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData?.error || "Gagal memuat sesi latihan.");
-        }
-        return res.json();
-      })
-      .then((data) => {
-        if (data.isCompleted) {
-          router.replace(`/results/${sessionId}`);
+  const [errorCode, setErrorCode] = useState<number | null>(null);
+
+  // Load session data with resilience & retry capabilities
+  const loadSession = useCallback(async (isRetry = false) => {
+    if (isRetry) setLoading(true);
+    setError(null);
+    setErrorCode(null);
+
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`);
+      if (!res.ok) {
+        setErrorCode(res.status);
+        const errData = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          router.replace(`/login?redirect=/practice/${sessionId}`);
           return;
         }
+        throw new Error(errData?.error || "Gagal memuat sesi latihan.");
+      }
 
-        setSession(data.session);
-        setSubjectName(data.subjectName);
-        setTopicName(data.topicName);
-        setQuestions(data.questions || []);
-        setAnswers(data.answers || {});
-        if (data.evaluations) {
-          setEvaluations(data.evaluations);
-        }
-      })
-      .catch((err) => {
-        setError(err.message || "Gagal memuat sesi latihan.");
-      })
-      .finally(() => setLoading(false));
+      const data = await res.json();
+      if (data.isCompleted) {
+        router.replace(`/results/${sessionId}`);
+        return;
+      }
+
+      setSession(data.session);
+      setSubjectName(data.subjectName);
+      setTopicName(data.topicName);
+      setQuestions(data.questions || []);
+      setAnswers(data.answers || {});
+      if (data.evaluations) {
+        setEvaluations(data.evaluations);
+      }
+    } catch (err: any) {
+      setError(err.message || "Gagal memuat sesi latihan.");
+    } finally {
+      setLoading(false);
+    }
   }, [sessionId, router]);
+
+  useEffect(() => {
+    loadSession();
+  }, [loadSession]);
 
   // Lazy explanation fetcher with caching & depth support
   const fetchExplanation = useCallback(
@@ -348,18 +363,50 @@ export default function PracticeRoomPage() {
   }
 
   if (error || !session || questions.length === 0) {
+    const isNotFound = errorCode === 404 || error?.toLowerCase().includes("tidak ditemukan");
+    const isForbidden = errorCode === 403 || error?.toLowerCase().includes("forbidden") || error?.toLowerCase().includes("hak akses");
+    const isMaintenance = errorCode === 503 || error?.toLowerCase().includes("pemeliharaan") || error?.toLowerCase().includes("maintenance");
+
     return (
       <div className="max-w-md mx-auto my-16 p-8 rounded-3xl bg-white border border-[#E5E7EB] shadow-card text-center space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-[#FEF2F2] text-[#DC2626] flex items-center justify-center mx-auto border border-[#FECACA]">
+        <div
+          className={cn(
+            "w-12 h-12 rounded-2xl flex items-center justify-center mx-auto border",
+            isForbidden
+              ? "bg-[#FFFBEB] text-[#D97706] border-[#FDE68A]"
+              : isMaintenance
+              ? "bg-[#F0FDF4] text-[#16A34A] border-[#BBF7D0]"
+              : "bg-[#FEF2F2] text-[#DC2626] border-[#FECACA]"
+          )}
+        >
           <AlertCircle className="w-6 h-6" />
         </div>
-        <h2 className="text-base font-bold text-[#0F172A]">Tidak Dapat Membuka Latihan</h2>
+        <h2 className="text-base font-bold text-[#0F172A]">
+          {isForbidden
+            ? "Akses Ditolak"
+            : isMaintenance
+            ? "Sistem Dalam Pemeliharaan"
+            : isNotFound
+            ? "Sesi Latihan Tidak Ditemukan"
+            : "Tidak Dapat Membuka Latihan"}
+        </h2>
         <p className="text-xs text-[#64748B] leading-relaxed">
           {error || "Data butir soal tidak ditemukan atau sesi latihan sudah selesai dievaluasi."}
         </p>
-        <Button variant="primary" onClick={() => router.push("/generator")}>
-          Kembali ke Buat Latihan
-        </Button>
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadSession(true)}
+            className="flex items-center gap-1.5"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Coba Lagi
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => router.push("/generator")}>
+            Buat Latihan Baru
+          </Button>
+        </div>
       </div>
     );
   }

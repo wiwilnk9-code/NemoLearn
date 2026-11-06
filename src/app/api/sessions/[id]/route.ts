@@ -15,20 +15,20 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       );
     }
 
-    const session = SessionRepository.getById(sessionId);
+    const session = await SessionRepository.getByIdAsync(sessionId);
     if (!session) {
       return NextResponse.json({ error: "Sesi latihan tidak ditemukan." }, { status: 404 });
     }
 
-    // Authorization: User cannot access other user's private sessions
-    if (session.userId !== user.id && user.role !== "admin" && user.role !== "guru") {
+    // Authorization: User cannot access other user's private sessions (Owner and Admin have full oversight)
+    if (session.userId !== user.id && user.role !== "admin" && user.role !== "owner" && user.role !== "guru") {
       return NextResponse.json({ error: "FORBIDDEN: Anda tidak memiliki hak akses untuk sesi ini." }, { status: 403 });
     }
 
     const subject = SubjectRepository.getById(session.config.subjectId);
     const topic = subject?.topics.find((t) => t.id === session.config.topicId);
-    const questions = QuestionRepository.getByIds(session.questionIds);
-    const existingResponses = ResponseRepository.getBySessionId(sessionId);
+    const questions = await QuestionRepository.getByIdsAsync(session.questionIds);
+    const existingResponses = await ResponseRepository.getBySessionIdAsync(sessionId);
 
     // If session is still active: RETURN SANITIZED PUBLIC QUESTIONS
     if (session.status === "active") {

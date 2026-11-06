@@ -57,7 +57,7 @@ export const SettingsTabAi: React.FC<SettingsTabAiProps> = ({
               : item.provider === "openai"
               ? "openai"
               : item.provider === "openrouter"
-              ? "openai-compatible"
+              ? "openrouter"
               : "openai",
           model: item.model,
           apiKey: "keep_existing",
@@ -228,9 +228,11 @@ export const SettingsTabAi: React.FC<SettingsTabAiProps> = ({
                 className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-lg px-3 py-2.5 font-mono appearance-none focus:outline-none focus:bg-white focus:border-blue-500 transition-colors"
               >
                 <option value="gpt-4o-mini">OpenAI — GPT-4o-mini (Revisi Cepat & Hemat Biaya)</option>
-                <option value="claude-3-5-sonnet">Anthropic — Claude 3.5 Sonnet (Analisis Soal Sulit)</option>
-                <option value="gemini-1-5-flash">Google — Gemini 1.5 Flash (Kecepatan Ekstrem & 1M Konteks)</option>
-                <option value="llama-3.3-70b-versatile">OpenRouter — Llama 3.3 70B (Open-Weights Fallback)</option>
+                <option value="anthropic/claude-3.5-sonnet">OpenRouter — Claude 3.5 Sonnet (Analisis Soal Sulit & Penalaran)</option>
+                <option value="meta-llama/llama-3.3-70b-instruct">OpenRouter — LLaMA 3.3 70B (Open-Weights Kualitas Tinggi)</option>
+                <option value="deepseek/deepseek-chat">OpenRouter — DeepSeek V3 (Penalaran Eksakta & Math)</option>
+                <option value="google/gemini-2.0-flash-001">OpenRouter — Gemini 2.0 Flash (Kecepatan Sangat Cepat)</option>
+                <option value="gemini-1-5-flash">Google — Gemini 1.5 Flash (Direct Native API & 1M Konteks)</option>
               </select>
             </div>
             <p className="text-[11px] text-slate-500">

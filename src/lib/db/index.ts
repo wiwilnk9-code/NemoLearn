@@ -50,6 +50,8 @@ import {
   GovernanceLogItem,
 } from "@/types/settings";
 import { UserFeedback, FeedbackFilterOptions } from "@/types/feedback";
+import { Announcement } from "@/types/announcement";
+import { UserNotification } from "@/types/notification";
 import {
   syncUserUpsert,
   syncUserDelete,
@@ -67,10 +69,34 @@ import {
   syncUserQuotaUpsert,
   AiUserQuotaRecord,
   hydrateFromSupabase,
+  fetchSessionByIdFromSupabase,
+  fetchQuestionsByIdsFromSupabase,
+  fetchResponsesBySessionIdFromSupabase,
+  syncAnnouncementUpsert,
+  syncAnnouncementDelete,
+  fetchActiveAnnouncementsFromSupabase,
+  fetchAllAnnouncementsFromSupabase,
+  syncNotificationUpsert,
+  syncNotificationMarkRead,
+  syncNotificationMarkAllRead,
+  fetchUserNotificationsFromSupabase,
 } from "./supabase-sync";
 
 export * from "@/types/settings";
 export * from "@/types/feedback";
+export * from "@/types/announcement";
+export * from "@/types/notification";
+export {
+  syncQuestionBatchUpsert,
+  syncQuestionUpsert,
+  syncQuestionDelete,
+  syncSessionUpsert,
+  syncResponseUpsert,
+  syncUserUpsert,
+  syncUserDelete,
+  syncWebsiteSettingsUpsert,
+  syncAISettingsUpsert,
+} from "./supabase-sync";
 
 export interface DatabaseState {
   users: Record<string, User>;
@@ -79,6 +105,8 @@ export interface DatabaseState {
   sessions: Record<string, PracticeSession>;
   responses: Record<string, SessionResponseRecord>;
   reports: QuestionIssueReport[];
+  announcements?: Record<string, Announcement>;
+  notifications?: Record<string, UserNotification>;
   feedbacks?: Record<string, UserFeedback>;
   systemLogs?: SystemLog[];
   websiteSettings?: WebsiteSettings;
@@ -314,6 +342,8 @@ function getInitialState(): DatabaseState {
     sessions: {},
     responses: {},
     reports: [],
+    announcements: {},
+    notifications: {},
     feedbacks: {},
     explanations: {},
     aiUserQuotas: {},
@@ -433,6 +463,12 @@ export function loadDb(): DatabaseState {
       }
       if (!memoryState!.reports) {
         memoryState!.reports = [];
+      }
+      if (!memoryState!.announcements || typeof memoryState!.announcements !== "object") {
+        memoryState!.announcements = {};
+      }
+      if (!memoryState!.notifications || typeof memoryState!.notifications !== "object") {
+        memoryState!.notifications = {};
       }
       if (!memoryState!.feedbacks || typeof memoryState!.feedbacks !== "object") {
         memoryState!.feedbacks = {};
@@ -1013,6 +1049,24 @@ export const QuestionRepository = {
     return ids.map((id) => db.questions[id]).filter(Boolean);
   },
 
+  async getByIdsAsync(ids: string[]): Promise<Question[]> {
+    const db = loadDb();
+    if (!db.questions) db.questions = {};
+    const missingIds = ids.filter((id) => !db.questions[id]);
+
+    if (missingIds.length > 0) {
+      const fetched = await fetchQuestionsByIdsFromSupabase(missingIds);
+      if (fetched && fetched.length > 0) {
+        fetched.forEach((q) => {
+          db.questions[q.id] = q;
+        });
+        saveDb(db);
+      }
+    }
+
+    return ids.map((id) => db.questions[id]).filter(Boolean);
+  },
+
   saveBatch(questions: Question[]): void {
     const db = loadDb();
     questions.forEach((q) => {
@@ -1161,6 +1215,21 @@ export const SessionRepository = {
   getById(id: string): PracticeSession | null {
     const db = loadDb();
     return db.sessions[id] || null;
+  },
+
+  async getByIdAsync(id: string): Promise<PracticeSession | null> {
+    const db = loadDb();
+    if (db.sessions && db.sessions[id]) {
+      return db.sessions[id];
+    }
+    const fromDb = await fetchSessionByIdFromSupabase(id);
+    if (fromDb) {
+      if (!db.sessions) db.sessions = {};
+      db.sessions[id] = fromDb;
+      saveDb(db);
+      return fromDb;
+    }
+    return null;
   },
 
   getByUserId(userId: string): PracticeSession[] {
@@ -1350,6 +1419,30 @@ export const ResponseRepository = {
       .forEach((r) => {
         result[r.questionId] = r;
       });
+    return result;
+  },
+
+  async getBySessionIdAsync(sessionId: string): Promise<Record<string, SessionResponseRecord>> {
+    const db = loadDb();
+    if (!db.responses) db.responses = {};
+    let sessionResponses = Object.values(db.responses).filter((r) => r.sessionId === sessionId);
+
+    if (sessionResponses.length === 0) {
+      const fetched = await fetchResponsesBySessionIdFromSupabase(sessionId);
+      if (fetched && fetched.length > 0) {
+        fetched.forEach((r) => {
+          const key = `${r.sessionId}:${r.questionId}`;
+          db.responses[key] = r;
+        });
+        saveDb(db);
+        sessionResponses = fetched;
+      }
+    }
+
+    const result: Record<string, SessionResponseRecord> = {};
+    sessionResponses.forEach((r) => {
+      result[r.questionId] = r;
+    });
     return result;
   },
 
@@ -3643,3 +3736,137 @@ export function getAdminDashboardSummary(trendDays: number = 7): AdminDashboardS
     pendingReportsCount,
   };
 }
+
+export const AnnouncementRepository = {
+  async getAll(): Promise<Announcement[]> {
+    const db = loadDb();
+    if (db.announcements && Object.keys(db.announcements).length > 0) {
+      return Object.values(db.announcements).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
+    const fromSupabase = await fetchAllAnnouncementsFromSupabase();
+    if (fromSupabase.length > 0) {
+      if (!db.announcements) db.announcements = {};
+      fromSupabase.forEach((a) => {
+        db.announcements![a.id] = a;
+      });
+      saveDb(db);
+      return fromSupabase;
+    }
+    return [];
+  },
+
+  async getActive(targetRole?: string): Promise<Announcement[]> {
+    const all = await this.getAll();
+    const now = Date.now();
+    return all.filter((a) => {
+      if (!a.isActive) return false;
+      if (a.validUntil && new Date(a.validUntil).getTime() <= now) return false;
+      if (
+        a.targetRole !== "all" &&
+        targetRole &&
+        a.targetRole !== targetRole &&
+        targetRole !== "owner" &&
+        targetRole !== "admin"
+      ) {
+        return false;
+      }
+      return true;
+    });
+  },
+
+  async create(announcement: Announcement): Promise<Announcement> {
+    const db = loadDb();
+    if (!db.announcements) db.announcements = {};
+    db.announcements[announcement.id] = announcement;
+    saveDb(db);
+    await syncAnnouncementUpsert(announcement);
+    return announcement;
+  },
+
+  async update(id: string, partial: Partial<Announcement>): Promise<Announcement | null> {
+    const db = loadDb();
+    if (!db.announcements || !db.announcements[id]) {
+      await this.getAll();
+      if (!db.announcements || !db.announcements[id]) return null;
+    }
+    const updated = {
+      ...db.announcements[id],
+      ...partial,
+      updatedAt: new Date().toISOString(),
+    };
+    db.announcements[id] = updated;
+    saveDb(db);
+    await syncAnnouncementUpsert(updated);
+    return updated;
+  },
+
+  async delete(id: string): Promise<boolean> {
+    const db = loadDb();
+    if (db.announcements && db.announcements[id]) {
+      delete db.announcements[id];
+      saveDb(db);
+    }
+    await syncAnnouncementDelete(id);
+    return true;
+  },
+};
+
+export const NotificationRepository = {
+  async getByUserId(userId: string): Promise<UserNotification[]> {
+    const db = loadDb();
+    if (!db.notifications) db.notifications = {};
+    const fromSupabase = await fetchUserNotificationsFromSupabase(userId);
+    if (fromSupabase && fromSupabase.length > 0) {
+      fromSupabase.forEach((n) => {
+        db.notifications![n.id] = n;
+      });
+      saveDb(db);
+    }
+    return Object.values(db.notifications)
+      .filter((n) => n.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  },
+
+  async getUnreadCount(userId: string): Promise<number> {
+    const list = await this.getByUserId(userId);
+    return list.filter((n) => !n.isRead).length;
+  },
+
+  async create(n: UserNotification): Promise<UserNotification> {
+    const db = loadDb();
+    if (!db.notifications) db.notifications = {};
+    db.notifications[n.id] = n;
+    saveDb(db);
+    await syncNotificationUpsert(n);
+    return n;
+  },
+
+  async markRead(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    const db = loadDb();
+    if (db.notifications && db.notifications[id]) {
+      db.notifications[id].isRead = true;
+      db.notifications[id].readAt = now;
+      saveDb(db);
+    }
+    await syncNotificationMarkRead(id, now);
+  },
+
+  async markAllRead(userId: string): Promise<void> {
+    const now = new Date().toISOString();
+    const db = loadDb();
+    if (db.notifications) {
+      Object.values(db.notifications)
+        .filter((n) => n.userId === userId && !n.isRead)
+        .forEach((n) => {
+          n.isRead = true;
+          n.readAt = now;
+        });
+      saveDb(db);
+    }
+    await syncNotificationMarkAllRead(userId, now);
+  },
+};
+

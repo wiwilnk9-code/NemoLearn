@@ -1,6 +1,6 @@
 import { PracticeMode, Question, ExplanationDepth } from "./question";
 
-export type AIProviderType = "gemini" | "openai" | "openai-compatible" | "mock";
+export type AIProviderType = "gemini" | "openai" | "openai-compatible" | "openrouter" | "mock";
 
 export interface QuestionGenRequest {
   subjectId: string;

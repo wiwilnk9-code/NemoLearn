@@ -13,6 +13,9 @@ import { SystemLog, QuestionIssueReport } from "@/types/admin";
 import { WebsiteSettings } from "@/types/settings";
 import { AISettings } from "@/types/ai";
 import { UserFeedback } from "@/types/feedback";
+import { Announcement } from "@/types/announcement";
+import { UserNotification } from "@/types/notification";
+import { formatIndonesianScore } from "@/lib/scoring/format";
 
 export function isTestEnvironment(): boolean {
   return (
@@ -257,6 +260,299 @@ export async function syncResponseUpsert(r: SessionResponseRecord): Promise<void
     }
   } catch (err: any) {
     console.error("[SupabaseSync Error] syncResponseUpsert exception:", err?.message || err);
+  }
+}
+
+export async function fetchSessionByIdFromSupabase(sessionId: string): Promise<PracticeSession | null> {
+  if (isTestEnvironment() || !sessionId) return null;
+  try {
+    const { data, error } = await supabaseServer
+      .from("practice_sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[SupabaseSync] fetchSessionById error:", error.message);
+      return null;
+    }
+    if (!data) return null;
+
+    const numScore = data.score !== null && data.score !== undefined ? Number(data.score) : null;
+    const session: PracticeSession = {
+      id: data.id,
+      userId: data.user_id,
+      config: data.config_json || {},
+      status: data.status || "active",
+      questionIds: Array.isArray(data.question_ids_json) ? data.question_ids_json : [],
+      score: numScore,
+      scoreFormatted: numScore !== null ? formatIndonesianScore(numScore) : null,
+      correctCount: data.correct_count ?? null,
+      wrongCount: data.wrong_count ?? null,
+      emptyCount: data.empty_count ?? null,
+      startedAt: data.started_at,
+      completedAt: data.completed_at || undefined,
+    };
+    return session;
+  } catch (err: any) {
+    console.error("[SupabaseSync Error] fetchSessionById exception:", err?.message || err);
+    return null;
+  }
+}
+
+export async function fetchQuestionsByIdsFromSupabase(questionIds: string[]): Promise<Question[]> {
+  if (isTestEnvironment() || !questionIds || questionIds.length === 0) return [];
+  try {
+    const { data, error } = await supabaseServer
+      .from("questions")
+      .select("*")
+      .in("id", questionIds);
+
+    if (error) {
+      console.error("[SupabaseSync] fetchQuestionsByIds error:", error.message);
+      return [];
+    }
+    if (!data || data.length === 0) return [];
+
+    return data.map((row) => ({
+      id: row.id,
+      subjectId: row.subject_id,
+      topicId: row.topic_id,
+      subtopic: row.subtopic || undefined,
+      level: row.level || "SMA",
+      type: row.type || "pilihan_ganda",
+      stem: row.stem,
+      options: Array.isArray(row.options_json) ? row.options_json : [],
+      correctAnswer: row.correct_answer,
+      explanation: row.explanation || "",
+      isAiGenerated: Boolean(row.is_ai_generated),
+      difficulty: row.difficulty || "sedang",
+      sourceType: row.source_type || "curated_bank",
+      sourceId: row.source_id || undefined,
+      status: row.status || "published",
+      version: row.version || 1,
+      hint: row.hint || undefined,
+      createdAt: row.created_at,
+    }));
+  } catch (err: any) {
+    console.error("[SupabaseSync Error] fetchQuestionsByIds exception:", err?.message || err);
+    return [];
+  }
+}
+
+export async function fetchResponsesBySessionIdFromSupabase(sessionId: string): Promise<SessionResponseRecord[]> {
+  if (isTestEnvironment() || !sessionId) return [];
+  try {
+    const { data, error } = await supabaseServer
+      .from("responses")
+      .select("*")
+      .eq("session_id", sessionId);
+
+    if (error) {
+      console.error("[SupabaseSync] fetchResponsesBySessionId error:", error.message);
+      return [];
+    }
+    if (!data || data.length === 0) return [];
+
+    return data.map((row) => ({
+      id: row.id || `${row.session_id}:${row.question_id}`,
+      sessionId: row.session_id,
+      questionId: row.question_id,
+      selectedAnswer: row.answer || null,
+      isCorrect: row.is_correct ?? null,
+      answeredAt: row.answered_at,
+    }));
+  } catch (err: any) {
+    console.error("[SupabaseSync Error] fetchResponsesBySessionId exception:", err?.message || err);
+    return [];
+  }
+}
+
+export async function syncAnnouncementUpsert(a: Announcement): Promise<void> {
+  if (isTestEnvironment()) return;
+  try {
+    const { error } = await supabaseServer.from("announcements").upsert({
+      id: a.id,
+      title: a.title,
+      message: a.message,
+      type: a.type || "info",
+      target_role: a.targetRole || "all",
+      is_active: a.isActive,
+      valid_until: a.validUntil || null,
+      created_at: a.createdAt || new Date().toISOString(),
+      created_by: a.createdBy || null,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) {
+      console.error("[SupabaseSync] Failed to upsert announcement:", error.message);
+    }
+  } catch (err: any) {
+    console.error("[SupabaseSync Error] syncAnnouncementUpsert exception:", err?.message || err);
+  }
+}
+
+export async function syncAnnouncementDelete(id: string): Promise<void> {
+  if (isTestEnvironment()) return;
+  try {
+    const { error } = await supabaseServer.from("announcements").delete().eq("id", id);
+    if (error) {
+      console.error("[SupabaseSync] Failed to delete announcement:", error.message);
+    }
+  } catch (err: any) {
+    console.error("[SupabaseSync Error] syncAnnouncementDelete exception:", err?.message || err);
+  }
+}
+
+export async function fetchActiveAnnouncementsFromSupabase(): Promise<Announcement[]> {
+  if (isTestEnvironment()) return [];
+  try {
+    const { data, error } = await supabaseServer
+      .from("announcements")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[SupabaseSync] fetchActiveAnnouncements error:", error.message);
+      return [];
+    }
+    if (!data) return [];
+
+    return data
+      .map((row) => ({
+        id: row.id,
+        title: row.title,
+        message: row.message,
+        type: row.type as any,
+        targetRole: row.target_role as any,
+        isActive: Boolean(row.is_active),
+        validUntil: row.valid_until || null,
+        createdAt: row.created_at,
+        createdBy: row.created_by || null,
+        updatedAt: row.updated_at || undefined,
+      }))
+      .filter((a) => !a.validUntil || new Date(a.validUntil).getTime() > Date.now());
+  } catch (err: any) {
+    console.error("[SupabaseSync Error] fetchActiveAnnouncements exception:", err?.message || err);
+    return [];
+  }
+}
+
+export async function fetchAllAnnouncementsFromSupabase(): Promise<Announcement[]> {
+  if (isTestEnvironment()) return [];
+  try {
+    const { data, error } = await supabaseServer
+      .from("announcements")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[SupabaseSync] fetchAllAnnouncements error:", error.message);
+      return [];
+    }
+    if (!data) return [];
+
+    return data.map((row) => ({
+      id: row.id,
+      title: row.title,
+      message: row.message,
+      type: row.type as any,
+      targetRole: row.target_role as any,
+      isActive: Boolean(row.is_active),
+      validUntil: row.valid_until || null,
+      createdAt: row.created_at,
+      createdBy: row.created_by || null,
+      updatedAt: row.updated_at || undefined,
+    }));
+  } catch (err: any) {
+    console.error("[SupabaseSync Error] fetchAllAnnouncements exception:", err?.message || err);
+    return [];
+  }
+}
+
+export async function syncNotificationUpsert(n: UserNotification): Promise<void> {
+  if (isTestEnvironment()) return;
+  try {
+    const { error } = await supabaseServer.from("notifications").upsert({
+      id: n.id,
+      user_id: n.userId,
+      title: n.title,
+      message: n.message,
+      type: n.type || "system",
+      is_read: n.isRead,
+      read_at: n.readAt || null,
+      link: n.link || null,
+      created_at: n.createdAt || new Date().toISOString(),
+    });
+    if (error) {
+      console.error("[SupabaseSync] Failed to upsert notification:", error.message);
+    }
+  } catch (err: any) {
+    console.error("[SupabaseSync Error] syncNotificationUpsert exception:", err?.message || err);
+  }
+}
+
+export async function syncNotificationMarkRead(id: string, readAt: string): Promise<void> {
+  if (isTestEnvironment()) return;
+  try {
+    const { error } = await supabaseServer
+      .from("notifications")
+      .update({ is_read: true, read_at: readAt })
+      .eq("id", id);
+    if (error) {
+      console.error("[SupabaseSync] Failed to mark notification read:", error.message);
+    }
+  } catch (err: any) {
+    console.error("[SupabaseSync Error] syncNotificationMarkRead exception:", err?.message || err);
+  }
+}
+
+export async function syncNotificationMarkAllRead(userId: string, readAt: string): Promise<void> {
+  if (isTestEnvironment()) return;
+  try {
+    const { error } = await supabaseServer
+      .from("notifications")
+      .update({ is_read: true, read_at: readAt })
+      .eq("user_id", userId)
+      .eq("is_read", false);
+    if (error) {
+      console.error("[SupabaseSync] Failed to mark all notifications read:", error.message);
+    }
+  } catch (err: any) {
+    console.error("[SupabaseSync Error] syncNotificationMarkAllRead exception:", err?.message || err);
+  }
+}
+
+export async function fetchUserNotificationsFromSupabase(userId: string): Promise<UserNotification[]> {
+  if (isTestEnvironment() || !userId) return [];
+  try {
+    const { data, error } = await supabaseServer
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("[SupabaseSync] fetchUserNotifications error:", error.message);
+      return [];
+    }
+    if (!data) return [];
+
+    return data.map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      title: row.title,
+      message: row.message,
+      type: row.type as any,
+      isRead: Boolean(row.is_read),
+      readAt: row.read_at || null,
+      link: row.link || null,
+      createdAt: row.created_at,
+    }));
+  } catch (err: any) {
+    console.error("[SupabaseSync Error] fetchUserNotifications exception:", err?.message || err);
+    return [];
   }
 }
 

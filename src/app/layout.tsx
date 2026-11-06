@@ -3,6 +3,8 @@ import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { Footer } from "@/components/Footer";
 import { ToastContainer } from "@/components/ui/Toast";
+import { AnnouncementBanner } from "@/components/AnnouncementBanner";
+import { MaintenanceOverlay } from "@/components/MaintenanceOverlay";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -26,9 +28,11 @@ export default function RootLayout({
       <body className="flex flex-col lg:flex-row min-h-screen bg-[#FAF9F5] text-[#0F172A] font-sans antialiased overflow-x-hidden selection:bg-[#DCFCE7] selection:text-[#15803D]">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 max-w-full overflow-x-hidden">
+          <AnnouncementBanner />
           <main className="flex-grow min-w-0">{children}</main>
           <Footer />
         </div>
+        <MaintenanceOverlay />
         <ToastContainer />
       </body>
     </html>

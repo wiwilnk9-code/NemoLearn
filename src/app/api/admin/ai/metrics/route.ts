@@ -116,6 +116,52 @@ export async function GET(req: Request) {
             : "unconfigured",
       },
       {
+        id: "openrouter",
+        name: "OpenRouter Unified Gateway",
+        providerType: "openrouter" as AIProviderType,
+        shortTag: "OR",
+        model:
+          activeSettings.provider === "openrouter"
+            ? activeSettings.model
+            : "meta-llama/llama-3.3-70b-instruct",
+        baseUrl:
+          activeSettings.provider === "openrouter"
+            ? activeSettings.baseUrl || "https://openrouter.ai/api/v1"
+            : "https://openrouter.ai/api/v1",
+        hasKey: Boolean(
+          dbSettings?.providerKeys?.openrouter ||
+            (activeSettings.provider === "openrouter" && activeSettings.apiKey) ||
+            process.env.OPENROUTER_API_KEY
+        ),
+        maskedKey: maskApiKey(
+          dbSettings?.providerKeys?.openrouter ||
+            (activeSettings.provider === "openrouter" ? activeSettings.apiKey : "") ||
+            process.env.OPENROUTER_API_KEY ||
+            ""
+        ),
+        isPrimary: activeSettings.provider === "openrouter",
+        avgLatencyMs: analytics.providerStats.openrouter?.avgLatency || 380,
+        successRate:
+          analytics.providerStats.openrouter?.count > 0
+            ? Number(
+                (
+                  (analytics.providerStats.openrouter.successCount /
+                    analytics.providerStats.openrouter.count) *
+                  100
+                ).toFixed(1)
+              )
+            : 99.9,
+        rateLimit: "10,000 RPM",
+        primaryFunction: "Claude, LLaMA, DeepSeek & Gemini Multi-Model Routing",
+        fallbackTier: "Priority 3 (OpenRouter Intelligent Failover)",
+        status:
+          activeSettings.provider === "openrouter"
+            ? "active"
+            : dbSettings?.providerKeys?.openrouter || process.env.OPENROUTER_API_KEY
+            ? "standby"
+            : "unconfigured",
+      },
+      {
         id: "openai-compatible",
         name: "Multi-Model AI Gateway",
         providerType: "openai-compatible" as AIProviderType,

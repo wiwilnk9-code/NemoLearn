@@ -25,11 +25,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // Hanya izinkan pembaruan data profil yang aman (mencegah privilege escalation)
+    // Hanya izinkan pembaruan data profil yang aman (mempertahankan peran asli & hak izin)
     const updated = UserRepository.update(user.id, {
       displayName: displayName.trim(),
       school: school ? String(school).trim() : undefined,
       gender: gender && ["laki-laki", "perempuan", "rahasia"].includes(gender) ? gender : undefined,
+      role: user.role, // Pertahankan peran otoritatif pengguna secara eksplisit
+      permissions: user.permissions,
     });
 
     return NextResponse.json({

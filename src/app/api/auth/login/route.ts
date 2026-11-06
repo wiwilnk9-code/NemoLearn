@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { UserRepository, SystemLogRepository } from "@/lib/db";
 import { createSessionToken, COOKIE_NAME, SESSION_MAX_AGE } from "@/lib/auth/server";
 import { verifyPassword, sanitizeUserOutput } from "@/lib/auth/password";
-import { User } from "@/types/user";
+import { User, UserRole, AdminPermission } from "@/types/user";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -60,69 +60,135 @@ export async function POST(req: Request) {
 
           if (!authError && authData?.user) {
             authValidated = true;
-            // Jika user lokal belum ada (misal proses lambda baru), cari di PostgreSQL atau inisialisasi
-            if (!targetUser) {
-              const { data: dbUser } = await supabaseServer
+            const authAppRole: UserRole | undefined = authData.user.app_metadata?.role;
+            let dbUser: any = null;
+
+            try {
+              const { data } = await supabaseServer
                 .from("users")
                 .select("*")
                 .eq("email", normalizedEmail)
                 .maybeSingle();
+              dbUser = data;
+            } catch {}
 
-              if (dbUser) {
-                targetUser = {
-                  id: dbUser.id,
-                  authProviderId: dbUser.auth_provider_id || authData.user.id,
-                  email: dbUser.email,
-                  displayName: dbUser.display_name,
-                  role: dbUser.role,
-                  school: dbUser.school || undefined,
-                  gender: dbUser.gender || undefined,
-                  avatarUrl: dbUser.avatar_url || undefined,
-                  status: dbUser.status,
-                  verificationStatus: dbUser.verification_status,
-                  nuptk: dbUser.nuptk || undefined,
-                  subject: dbUser.subject || undefined,
-                  portfolioUrl: dbUser.portfolio_url || undefined,
-                  verificationNote: dbUser.verification_note || undefined,
-                  permissions: dbUser.permissions || [],
-                  passwordHash: dbUser.password_hash || undefined,
-                  emailVerified: Boolean(dbUser.email_verified || authData.user.email_confirmed_at),
-                  authProvider: dbUser.auth_provider || "email",
-                  createdAt: dbUser.created_at,
-                  lastActiveAt: new Date().toISOString(),
-                  tosVersion: dbUser.tos_version || "2026.11",
-                  privacyVersion: dbUser.privacy_version || "2026.11",
-                };
-                UserRepository.create(targetUser);
-              } else {
-                const meta = authData.user.user_metadata || {};
-                const newUser: User = {
-                  id: authData.user.id,
-                  authProviderId: authData.user.id,
-                  email: normalizedEmail,
-                  displayName: meta.display_name || meta.name || normalizedEmail.split("@")[0],
-                  role: "pelajar",
-                  status: "active",
-                  verificationStatus: "verified",
-                  emailVerified: Boolean(authData.user.email_confirmed_at || authData.user.confirmed_at),
-                  authProvider: "email",
-                  createdAt: authData.user.created_at || new Date().toISOString(),
-                  lastActiveAt: new Date().toISOString(),
-                };
-                targetUser = UserRepository.create(newUser);
-              }
-            } else if (!targetUser.authProviderId) {
+            // Authoritative Role Resolution & Anti-Demotion Reconciliation
+            let resolvedRole: UserRole = "pelajar";
+            if (authAppRole === "owner" || dbUser?.role === "owner" || targetUser?.role === "owner") {
+              resolvedRole = "owner";
+            } else if (authAppRole === "admin" || dbUser?.role === "admin" || targetUser?.role === "admin") {
+              resolvedRole = "admin";
+            } else if (authAppRole === "guru" || dbUser?.role === "guru" || targetUser?.role === "guru") {
+              resolvedRole = "guru";
+            } else if (authAppRole === "moderator" || dbUser?.role === "moderator" || targetUser?.role === "moderator") {
+              resolvedRole = "moderator";
+            } else if (dbUser?.role) {
+              resolvedRole = dbUser.role;
+            } else if (targetUser?.role) {
+              resolvedRole = targetUser.role;
+            }
+
+            const ALL_ADMIN_PERMISSION_IDS: AdminPermission[] = [
+              "manage_users",
+              "manage_questions",
+              "manage_sessions",
+              "view_analytics",
+              "manage_ai",
+              "manage_settings",
+              "view_audit_logs",
+            ];
+
+            const resolvedPermissions =
+              resolvedRole === "owner"
+                ? ALL_ADMIN_PERMISSION_IDS
+                : resolvedRole === "admin"
+                ? (targetUser?.permissions && targetUser.permissions.length > 0
+                    ? targetUser.permissions
+                    : dbUser?.permissions || [
+                        "manage_users",
+                        "manage_questions",
+                        "manage_sessions",
+                        "view_analytics",
+                        "view_audit_logs",
+                      ])
+                : [];
+
+            if (dbUser) {
+              targetUser = {
+                id: dbUser.id,
+                authProviderId: dbUser.auth_provider_id || authData.user.id,
+                email: dbUser.email,
+                displayName: dbUser.display_name,
+                role: resolvedRole,
+                school: dbUser.school || undefined,
+                gender: dbUser.gender || undefined,
+                avatarUrl: dbUser.avatar_url || undefined,
+                status: dbUser.status,
+                verificationStatus: dbUser.verification_status,
+                nuptk: dbUser.nuptk || undefined,
+                subject: dbUser.subject || undefined,
+                portfolioUrl: dbUser.portfolio_url || undefined,
+                verificationNote: dbUser.verification_note || undefined,
+                permissions: resolvedPermissions,
+                passwordHash: dbUser.password_hash || undefined,
+                emailVerified: Boolean(dbUser.email_verified || authData.user.email_confirmed_at),
+                authProvider: dbUser.auth_provider || "email",
+                createdAt: dbUser.created_at,
+                lastActiveAt: new Date().toISOString(),
+                tosVersion: dbUser.tos_version || "2026.11",
+                privacyVersion: dbUser.privacy_version || "2026.11",
+              };
+              UserRepository.create(targetUser);
+            } else if (!targetUser) {
+              const meta = authData.user.user_metadata || {};
+              const newUser: User = {
+                id: authData.user.id,
+                authProviderId: authData.user.id,
+                email: normalizedEmail,
+                displayName: meta.display_name || meta.name || normalizedEmail.split("@")[0],
+                role: resolvedRole,
+                permissions: resolvedPermissions,
+                status: "active",
+                verificationStatus: "verified",
+                emailVerified: Boolean(authData.user.email_confirmed_at || authData.user.confirmed_at),
+                authProvider: "email",
+                createdAt: authData.user.created_at || new Date().toISOString(),
+                lastActiveAt: new Date().toISOString(),
+              };
+              targetUser = UserRepository.create(newUser);
+            } else {
+              targetUser.role = resolvedRole;
+              targetUser.permissions = resolvedPermissions;
               UserRepository.update(targetUser.id, {
                 authProviderId: authData.user.id,
+                role: resolvedRole,
+                permissions: resolvedPermissions,
                 emailVerified: Boolean(authData.user.email_confirmed_at || authData.user.confirmed_at),
               });
             }
 
             try {
-              await supabaseServer.auth.admin.updateUserById(authData.user.id, {
-                app_metadata: { role: targetUser.role },
+              await supabaseServer.from("users").upsert({
+                id: targetUser.id,
+                auth_provider_id: authData.user.id,
+                email: targetUser.email,
+                display_name: targetUser.displayName,
+                role: resolvedRole,
+                permissions: resolvedPermissions,
+                email_verified: Boolean(targetUser.emailVerified),
+                status: targetUser.status || "active",
+                last_active_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
               });
             } catch {}
+
+            if (resolvedRole === "owner" || resolvedRole === "admin") {
+              try {
+                await supabaseServer.auth.admin.updateUserById(authData.user.id, {
+                  app_metadata: { ...authData.user.app_metadata, role: resolvedRole },
+                });
+              } catch {}
+            }
           }
         } catch (sbErr) {
           console.warn("[Login] Supabase signInWithPassword exception:", sbErr);

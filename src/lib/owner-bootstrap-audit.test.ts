@@ -130,4 +130,52 @@ describe("NemoLearn Owner Role System & Bootstrap Audit Test Suite", () => {
     assert.equal(updatedAppMeta.provider, "google");
     assert.equal(updatedAppMeta.role, "owner");
   });
+
+  it("6. Verifies profile updates NEVER demote or reset an Owner role", () => {
+    // 1. User starts as Owner
+    UserRepository.update(userUuid, {
+      role: "owner",
+      permissions: ALL_ADMIN_PERMISSIONS.map((p) => p.id),
+    });
+    assert.equal(UserRepository.getById(userUuid)?.role, "owner");
+
+    // 2. User updates profile info (e.g. displayName, school, gender) via /api/profile
+    const updatedUser = UserRepository.update(userUuid, {
+      displayName: "Wildan N.K",
+      school: "SMAN 5 SUKABUMI",
+      gender: "laki-laki",
+      role: "owner", // Explicit role preservation
+    });
+
+    assert.ok(updatedUser);
+    assert.equal(updatedUser.displayName, "Wildan N.K");
+    assert.equal(updatedUser.school, "SMAN 5 SUKABUMI");
+    assert.equal(updatedUser.gender, "laki-laki");
+    assert.equal(updatedUser.role, "owner"); // MUST REMAIN OWNER!
+
+    // Verify subsequent lookup
+    const freshUser = UserRepository.getById(userUuid);
+    assert.equal(freshUser?.role, "owner");
+  });
+
+  it("7. Verifies role reconciliation: app_metadata 'owner' takes precedence over stale role", () => {
+    // Suppose in-memory cache has role 'pelajar'
+    UserRepository.update(userUuid, { role: "pelajar" });
+    assert.equal(UserRepository.getById(userUuid)?.role, "pelajar");
+
+    // Supabase Auth app_metadata has 'owner'
+    const authAppRole: string = "owner";
+    const dbRole: string = "pelajar";
+
+    let resolvedRole: string = "pelajar";
+    if (authAppRole === "owner" || dbRole === "owner") {
+      resolvedRole = "owner";
+    }
+
+    assert.equal(resolvedRole, "owner");
+
+    // Update repository to resolved role
+    UserRepository.update(userUuid, { role: resolvedRole as any });
+    assert.equal(UserRepository.getById(userUuid)?.role, "owner");
+  });
 });

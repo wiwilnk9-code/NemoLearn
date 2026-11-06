@@ -391,10 +391,18 @@ async function main() {
       role: targetRole,
     };
 
+    // Bersihkan residu role dari user_metadata jika ada (agar tidak ambigu dengan app_metadata)
+    const userMetaUpdates = {};
+    if (targetAuthUser.user_metadata && targetAuthUser.user_metadata.role) {
+      userMetaUpdates.user_metadata = { ...targetAuthUser.user_metadata };
+      delete userMetaUpdates.user_metadata.role;
+    }
+
     const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
       targetAuthUser.id,
       {
         app_metadata: updatedAppMeta,
+        ...userMetaUpdates,
       }
     );
 
@@ -449,6 +457,18 @@ async function main() {
       if (pgInsertErr) throw pgInsertErr;
       console.log("✓ PostgreSQL public.users: Record user baru berhasil disisipkan dengan role '" + targetRole + "'.");
     }
+
+    // Read-back verification untuk memastikan data tersimpan persisten
+    const { data: verifyPg } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", targetAuthUser.id)
+      .maybeSingle();
+
+    if (verifyPg?.role !== targetRole) {
+      throw new Error(`Verifikasi read-back gagal: public.users.role terbaca '${verifyPg?.role}', diharapkan '${targetRole}'.`);
+    }
+    console.log("✓ Read-Back Verification: PostgreSQL mengonfirmasi role '" + targetRole + "' tersimpan aktif.");
   } catch (err) {
     console.error("❌ Gagal memperbarui tabel public.users:", err.message);
     process.exit(1);

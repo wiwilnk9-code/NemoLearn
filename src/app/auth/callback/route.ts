@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient, supabaseServer } from "@/lib/supabase/server";
 import { UserRepository, SystemLogRepository } from "@/lib/db";
 import { createSessionToken, COOKIE_NAME, SESSION_MAX_AGE } from "@/lib/auth/server";
-import { User } from "@/types/user";
+import { User, UserRole, AdminPermission } from "@/types/user";
 
 export const dynamic = "force-dynamic";
 
@@ -110,51 +110,98 @@ export async function GET(req: Request) {
       meta.full_name || meta.name || meta.given_name || normalizedEmail.split("@")[0];
     const avatarUrl = meta.avatar_url || meta.picture || null;
 
-    let targetUser: User | null = UserRepository.getByEmail(normalizedEmail);
+    // 4. Authoritative Role Resolution across Supabase Auth & PostgreSQL:
+    // Baca app_metadata.role (Supabase Auth) dan public.users.role (PostgreSQL)
+    const authAppRole: UserRole | undefined = authUser.app_metadata?.role;
+    let dbUser: any = null;
 
-    // Jika belum ditemukan di cache in-memory, periksa langsung ke database Supabase PostgreSQL
-    if (!targetUser && process.env.NODE_ENV !== "test") {
+    if (process.env.NODE_ENV !== "test") {
       try {
-        const { data: dbUser } = await supabaseServer
+        const { data } = await supabaseServer
           .from("users")
           .select("*")
           .eq("email", normalizedEmail)
           .maybeSingle();
-
-        if (dbUser) {
-          targetUser = {
-            id: dbUser.id,
-            authProviderId: dbUser.auth_provider_id || authUser.id,
-            email: dbUser.email,
-            displayName: dbUser.display_name,
-            role: dbUser.role,
-            school: dbUser.school || undefined,
-            gender: dbUser.gender || undefined,
-            avatarUrl: dbUser.avatar_url || undefined,
-            status: dbUser.status,
-            verificationStatus: dbUser.verification_status,
-            nuptk: dbUser.nuptk || undefined,
-            subject: dbUser.subject || undefined,
-            portfolioUrl: dbUser.portfolio_url || undefined,
-            verificationNote: dbUser.verification_note || undefined,
-            permissions: dbUser.permissions || [],
-            passwordHash: dbUser.password_hash || undefined,
-            emailVerified: Boolean(dbUser.email_verified),
-            authProvider: dbUser.auth_provider || "google",
-            createdAt: dbUser.created_at,
-            lastActiveAt: new Date().toISOString(),
-            tosVersion: dbUser.tos_version || "2026.11",
-            privacyVersion: dbUser.privacy_version || "2026.11",
-          };
-          UserRepository.create(targetUser);
-        }
+        dbUser = data;
       } catch (dbErr) {
         console.warn("[OAuth Callback] Supabase PostgreSQL direct lookup fallback:", dbErr);
       }
     }
 
-    // 4. Perilaku Account Linking:
-    // Jika email Google sudah terdaftar, tautkan ID auth tanpa membuat akun ganda
+    let targetUser: User | null = UserRepository.getByEmail(normalizedEmail);
+
+    if (dbUser && !targetUser) {
+      targetUser = {
+        id: dbUser.id,
+        authProviderId: dbUser.auth_provider_id || authUser.id,
+        email: dbUser.email,
+        displayName: dbUser.display_name,
+        role: dbUser.role,
+        school: dbUser.school || undefined,
+        gender: dbUser.gender || undefined,
+        avatarUrl: dbUser.avatar_url || undefined,
+        status: dbUser.status,
+        verificationStatus: dbUser.verification_status,
+        nuptk: dbUser.nuptk || undefined,
+        subject: dbUser.subject || undefined,
+        portfolioUrl: dbUser.portfolio_url || undefined,
+        verificationNote: dbUser.verification_note || undefined,
+        permissions: dbUser.permissions || [],
+        passwordHash: dbUser.password_hash || undefined,
+        emailVerified: Boolean(dbUser.email_verified),
+        authProvider: dbUser.auth_provider || "google",
+        createdAt: dbUser.created_at,
+        lastActiveAt: new Date().toISOString(),
+        tosVersion: dbUser.tos_version || "2026.11",
+        privacyVersion: dbUser.privacy_version || "2026.11",
+      };
+      UserRepository.create(targetUser);
+    }
+
+    // Role Hierarchy & Anti-Demotion Reconciliation:
+    // Jika salah satu sumber menetapkan peran administratif (owner, admin, guru),
+    // jangan pernah turunkan ke 'pelajar'!
+    let resolvedRole: UserRole = "pelajar";
+    if (authAppRole === "owner" || dbUser?.role === "owner" || targetUser?.role === "owner") {
+      resolvedRole = "owner";
+    } else if (authAppRole === "admin" || dbUser?.role === "admin" || targetUser?.role === "admin") {
+      resolvedRole = "admin";
+    } else if (authAppRole === "guru" || dbUser?.role === "guru" || targetUser?.role === "guru") {
+      resolvedRole = "guru";
+    } else if (authAppRole === "moderator" || dbUser?.role === "moderator" || targetUser?.role === "moderator") {
+      resolvedRole = "moderator";
+    } else if (dbUser?.role) {
+      resolvedRole = dbUser.role;
+    } else if (targetUser?.role) {
+      resolvedRole = targetUser.role;
+    }
+
+    const ALL_ADMIN_PERMISSION_IDS: AdminPermission[] = [
+      "manage_users",
+      "manage_questions",
+      "manage_sessions",
+      "view_analytics",
+      "manage_ai",
+      "manage_settings",
+      "view_audit_logs",
+    ];
+
+    const resolvedPermissions =
+      resolvedRole === "owner"
+        ? ALL_ADMIN_PERMISSION_IDS
+        : resolvedRole === "admin"
+        ? (targetUser?.permissions && targetUser.permissions.length > 0
+            ? targetUser.permissions
+            : dbUser?.permissions || [
+                "manage_users",
+                "manage_questions",
+                "manage_sessions",
+                "view_analytics",
+                "view_audit_logs",
+              ])
+        : [];
+
+    // 5. Perilaku Account Linking atau Registrasi:
     if (targetUser) {
       // Suspended Guard: Jangan biarkan akun suspended masuk melalui OAuth
       if (targetUser.status === "suspended") {
@@ -170,10 +217,14 @@ export async function GET(req: Request) {
         return NextResponse.redirect(new URL("/login?error=suspended", req.url));
       }
 
-      // Pertahankan peran yang sudah ada (jangan demote admin/guru, jangan eskalasi hak istimewa)
+      targetUser.role = resolvedRole;
+      targetUser.permissions = resolvedPermissions;
+
       UserRepository.update(targetUser.id, {
         authProviderId: authUser.id,
         emailVerified: true,
+        role: resolvedRole,
+        permissions: resolvedPermissions,
         avatarUrl: targetUser.avatarUrl || avatarUrl || undefined,
         lastActiveAt: new Date().toISOString(),
       });
@@ -184,14 +235,12 @@ export async function GET(req: Request) {
         actorId: targetUser.id,
         actorEmail: targetUser.email,
         actorName: targetUser.displayName,
-        actorRole: targetUser.role,
-        details: `Akun terdaftar '${targetUser.email}' berhasil ditautkan ke Google OAuth.`,
+        actorRole: resolvedRole,
+        details: `Akun terdaftar '${targetUser.email}' berhasil ditautkan ke Google OAuth (Role: ${resolvedRole}).`,
         status: "SUKSES",
       });
     } else {
-      // 5. Pengguna Baru: Registrasi otomatis dengan peran default 'pelajar' (Student)
-      // JAMINAN KEAMANAN: Jangan pernah memberikan role Admin atau Owner kepada pengguna Google baru
-      const defaultRole = "pelajar";
+      // 6. Pengguna Baru: Registrasi otomatis dengan peran terverifikasi
       const nowIso = new Date().toISOString();
 
       const newUser: User = {
@@ -199,7 +248,8 @@ export async function GET(req: Request) {
         authProviderId: authUser.id,
         email: normalizedEmail,
         displayName: String(displayName).trim(),
-        role: defaultRole,
+        role: resolvedRole,
+        permissions: resolvedPermissions,
         avatarUrl: avatarUrl || undefined,
         status: "active",
         verificationStatus: "verified",
@@ -221,17 +271,38 @@ export async function GET(req: Request) {
         actorId: targetUser.id,
         actorEmail: targetUser.email,
         actorName: targetUser.displayName,
-        actorRole: defaultRole,
-        details: `Pengguna baru mendaftar via Google OAuth (${targetUser.email}) dengan peran default '${defaultRole}'.`,
+        actorRole: resolvedRole,
+        details: `Pengguna baru mendaftar via Google OAuth (${targetUser.email}) dengan peran '${resolvedRole}'.`,
         status: "SUKSES",
       });
+    }
+
+    // Sinkronkan peran ke database PostgreSQL (public.users)
+    if (process.env.NODE_ENV !== "test") {
+      try {
+        await supabaseServer.from("users").upsert({
+          id: targetUser.id,
+          auth_provider_id: authUser.id,
+          email: targetUser.email,
+          display_name: targetUser.displayName,
+          role: resolvedRole,
+          permissions: resolvedPermissions,
+          email_verified: true,
+          status: targetUser.status || "active",
+          avatar_url: targetUser.avatarUrl || avatarUrl || null,
+          last_active_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      } catch (upsertErr) {
+        console.warn("[OAuth Callback] public.users upsert warning:", upsertErr);
+      }
     }
 
     // Sinkronkan peran ke app_metadata Supabase Auth (Otorisasi Server-Side & RLS)
     if (process.env.NODE_ENV !== "test") {
       try {
         await supabaseServer.auth.admin.updateUserById(authUser.id, {
-          app_metadata: { role: targetUser.role },
+          app_metadata: { ...authUser.app_metadata, role: resolvedRole },
         });
       } catch (metaErr) {
         // Fallback jika service role admin belum aktif

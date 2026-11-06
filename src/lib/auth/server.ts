@@ -6,6 +6,7 @@
 
 import { User, UserRole, AdminPermission } from "@/types/user";
 import { UserRepository } from "@/lib/db";
+import { isTestEnvironment } from "@/lib/db/supabase-sync";
 import { supabaseServer } from "@/lib/supabase/server";
 import { hasPermission } from "./permissions";
 import crypto from "crypto";
@@ -131,10 +132,11 @@ export async function getCurrentUser(
     if (!payload) return null;
 
     // Verifikasi keberadaan dan keaktifan user langsung di database (server authoritative)
-    let user = UserRepository.getById(payload.userId);
+    let user: User | null = null;
 
-    // Fallback: jika belum ada di cache memory (misal proses lambda baru), ambil langsung dari Supabase
-    if (!user && process.env.NODE_ENV !== "test") {
+    // Di lingkungan produksi/server (non-test), selalu verifikasi ke PostgreSQL & Supabase Auth
+    // untuk menjamin Single Source of Truth dan mencegah stale in-memory cache
+    if (!isTestEnvironment()) {
       try {
         const { data: row } = await supabaseServer
           .from("users")
@@ -143,12 +145,51 @@ export async function getCurrentUser(
           .maybeSingle();
 
         if (row) {
+          let resolvedRole: UserRole = row.role;
+          let resolvedPermissions = row.permissions || [];
+
+          // Authoritative Role Reconciliation & Auto-Heal:
+          // Jika payload sesi atau app_metadata Supabase Auth adalah 'owner', pastikan user diakui sebagai 'owner'
+          if (resolvedRole !== "owner") {
+            if (payload.role === "owner") {
+              resolvedRole = "owner";
+            } else if (supabaseServer.auth && supabaseServer.auth.admin) {
+              try {
+                const { data: authData } = await supabaseServer.auth.admin.getUserById(row.id);
+                if (authData?.user?.app_metadata?.role === "owner") {
+                  resolvedRole = "owner";
+                }
+              } catch {}
+            }
+
+            if (resolvedRole === "owner") {
+              resolvedPermissions = [
+                "manage_users",
+                "manage_questions",
+                "manage_sessions",
+                "view_analytics",
+                "manage_ai",
+                "manage_settings",
+                "view_audit_logs",
+              ];
+              // Auto-heal public.users agar konsisten secara permanen
+              await supabaseServer
+                .from("users")
+                .update({
+                  role: "owner",
+                  permissions: resolvedPermissions,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", row.id);
+            }
+          }
+
           user = {
             id: row.id,
             authProviderId: row.auth_provider_id || undefined,
             email: row.email,
             displayName: row.display_name,
-            role: row.role,
+            role: resolvedRole,
             school: row.school || undefined,
             gender: row.gender || undefined,
             avatarUrl: row.avatar_url || undefined,
@@ -158,7 +199,7 @@ export async function getCurrentUser(
             subject: row.subject || undefined,
             portfolioUrl: row.portfolio_url || undefined,
             verificationNote: row.verification_note || undefined,
-            permissions: row.permissions || [],
+            permissions: resolvedPermissions,
             passwordHash: row.password_hash || undefined,
             emailVerified: Boolean(row.email_verified),
             verificationToken: row.verification_token || undefined,
@@ -183,6 +224,11 @@ export async function getCurrentUser(
       } catch (err) {
         console.warn("[ServerAuth] Supabase direct user lookup fallback skipped:", err);
       }
+    }
+
+    // Fallback ke in-memory UserRepository (untuk unit test atau jika koneksi Supabase terputus)
+    if (!user) {
+      user = UserRepository.getById(payload.userId);
     }
 
     if (!user || user.status !== "active") return null;

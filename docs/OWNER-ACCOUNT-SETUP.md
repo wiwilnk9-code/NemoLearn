@@ -173,7 +173,38 @@ Setelah masuk sebagai Owner, Anda memiliki akses tanpa batas ke:
 
 ---
 
-## 7. Cara Mengembalikan Role (Rollback / Revert)
+## 7. Tool Diagnostik & Verifikasi Integritas Role
+
+NemoLearn menyediakan fungsi diagnostik terpadu untuk mengaudit keselarasan role di seluruh layer:
+
+### A. Diagnostik via Terminal CLI
+Jalankan perintah berikut untuk mengaudit seluruh sumber role:
+```bash
+npm run diagnostic:role
+# atau
+npm run diagnostic:role -- --email="wildannk9@gmail.com"
+```
+Jika terdeteksi inkonsistensi (misal `app_metadata` bernilai `owner` tapi `public.users` tertimpa `pelajar`), Anda dapat menyembuhkannya secara otomatis (*self-heal*):
+```bash
+npm run diagnostic:role -- --email="wildannk9@gmail.com" --heal
+```
+
+### B. Diagnostik via Endpoint API (/api/admin/diagnostic)
+Ketika sudah login sebagai Owner/Admin, kunjungi atau panggil endpoint:
+`GET https://nemolearn.vercel.app/api/admin/diagnostic`
+
+Endpoint ini mengembalikan data JSON:
+- `userId` & `email`
+- `authAppMetadataRole`: role dari Supabase Auth
+- `publicUsersRole`: role dari PostgreSQL
+- `sessionTokenRole`: role dari cookie sesi HMAC
+- `effectiveRole`: role aktual yang dieksekusi oleh sistem otorisasi
+- `isConsistent`: boolean keselarasan data
+- `sessionNeedsRefresh`: penanda jika browser perlu login ulang
+
+---
+
+## 8. Cara Mengembalikan Role (Rollback / Revert)
 
 Jika suatu saat Anda ingin menurunkan hak akses akun kembali menjadi peran biasa (misalnya untuk pengujian antarmuka dari sudut pandang siswa atau guru), Anda dapat menjalankan script rollback:
 
@@ -195,7 +226,7 @@ Setelah menjalankan perintah revert:
 
 ---
 
-## 8. Panduan Troubleshooting
+## 9. Panduan Troubleshooting
 
 - **Error: "Akun dengan email '...' tidak ditemukan di Supabase Auth"**:
   Pastikan akun Anda sudah terdaftar terlebih dahulu. Lakukan login satu kali di `https://nemolearn.vercel.app/login` via Google OAuth agar akun Anda tercatat di Supabase Auth.

@@ -5,7 +5,7 @@
  */
 
 import { supabaseServer } from "@/lib/supabase/server";
-import { User } from "@/types/user";
+import { User, UserRole } from "@/types/user";
 import { Question } from "@/types/question";
 import { PracticeSession } from "@/types/session";
 import { SessionResponseRecord } from "@/types/response";
@@ -14,7 +14,7 @@ import { WebsiteSettings } from "@/types/settings";
 import { AISettings } from "@/types/ai";
 import { UserFeedback } from "@/types/feedback";
 
-function isTestEnvironment(): boolean {
+export function isTestEnvironment(): boolean {
   return (
     process.env.NODE_ENV === "test" ||
     process.execArgv.some((a) => a.includes("--test")) ||
@@ -27,12 +27,60 @@ function isTestEnvironment(): boolean {
 export async function syncUserUpsert(u: User): Promise<void> {
   if (isTestEnvironment()) return;
   try {
+    let effectiveRole = u.role;
+    let effectivePermissions = u.permissions || [];
+
+    // Anti-Demotion & Role Inconsistency Guard:
+    // Mencegah akun yang sudah memiliki peran administratif (owner, admin, guru) tertimpa
+    // secara tidak sengaja oleh peran default 'pelajar' akibat pembaruan profil atau sesi.
+    try {
+      const { data: existingDb } = await supabaseServer
+        .from("users")
+        .select("role, permissions")
+        .eq("id", u.id)
+        .maybeSingle();
+
+      if (existingDb) {
+        const adminRoles: UserRole[] = ["owner", "admin", "guru", "moderator"];
+        if (adminRoles.includes(existingDb.role) && u.role === "pelajar") {
+          effectiveRole = existingDb.role;
+          effectivePermissions =
+            existingDb.permissions && existingDb.permissions.length > 0
+              ? existingDb.permissions
+              : effectivePermissions;
+          u.role = effectiveRole;
+          u.permissions = effectivePermissions;
+        }
+      }
+
+      // Periksa app_metadata di auth.users jika role belum owner
+      if (effectiveRole !== "owner" && supabaseServer.auth && supabaseServer.auth.admin) {
+        const { data: authUserData } = await supabaseServer.auth.admin.getUserById(u.id);
+        if (authUserData?.user?.app_metadata?.role === "owner") {
+          effectiveRole = "owner";
+          effectivePermissions = [
+            "manage_users",
+            "manage_questions",
+            "manage_sessions",
+            "view_analytics",
+            "manage_ai",
+            "manage_settings",
+            "view_audit_logs",
+          ];
+          u.role = effectiveRole;
+          u.permissions = effectivePermissions;
+        }
+      }
+    } catch (checkErr) {
+      console.warn("[SupabaseSync Anti-Demotion Guard] Check skipped:", checkErr);
+    }
+
     const { error } = await supabaseServer.from("users").upsert({
       id: u.id,
       auth_provider_id: u.authProviderId || null,
       email: u.email,
       display_name: u.displayName,
-      role: u.role,
+      role: effectiveRole,
       school: u.school || null,
       gender: u.gender || "rahasia",
       avatar_url: u.avatarUrl || null,
@@ -42,7 +90,7 @@ export async function syncUserUpsert(u: User): Promise<void> {
       subject: u.subject || null,
       portfolio_url: u.portfolioUrl || null,
       verification_note: u.verificationNote || null,
-      permissions: u.permissions || [],
+      permissions: effectivePermissions,
       password_hash: u.passwordHash || null,
       email_verified: Boolean(u.emailVerified),
       verification_token: u.verificationToken || null,
@@ -65,6 +113,15 @@ export async function syncUserUpsert(u: User): Promise<void> {
     });
     if (error) {
       console.error("[SupabaseSync] Failed to upsert user:", error.message);
+    }
+
+    // Jika user adalah owner, pastikan app_metadata Supabase Auth selalu tersinkronisasi
+    if (effectiveRole === "owner" && supabaseServer.auth && supabaseServer.auth.admin) {
+      try {
+        await supabaseServer.auth.admin.updateUserById(u.id, {
+          app_metadata: { role: "owner" },
+        });
+      } catch {}
     }
   } catch (err: any) {
     console.error("[SupabaseSync Error] syncUserUpsert exception:", err?.message || err);

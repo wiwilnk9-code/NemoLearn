@@ -11,7 +11,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "node -r ./register-alias.js -r jiti/register --test src/**/*.test.ts",
-    "bootstrap:owner": "node scripts/bootstrap-owner.js"
+    "bootstrap:owner": "node scripts/bootstrap-owner.js",
+    "diagnostic:role": "node scripts/diagnostic-role.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

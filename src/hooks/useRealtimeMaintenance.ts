@@ -9,7 +9,7 @@ export function useRealtimeMaintenance() {
   const [maintenance, setMaintenance] = useState<MaintenanceConfig>({
     enabled: false,
     scope: "all",
-    message: "Platform sedang dalam pemeliharaan sistem terencana.",
+    message: "Kami sedang melakukan peningkatan kapasitas server AI & pembaruan database kurikulum. Kami akan kembali online pukul 14:00 WIB.",
     estimatedEndTime: "14:00 WIB",
     bypassIpWhitelist: [],
   });
@@ -18,7 +18,11 @@ export function useRealtimeMaintenance() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch("/api/maintenance/status");
+      // Timestamp query parameter and cache: "no-store" guarantee immediate fresh status
+      const res = await fetch(`/api/maintenance/status?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
       if (res.ok) {
         const data = await res.json();
         setMaintenanceMode(Boolean(data.maintenanceMode));
@@ -51,15 +55,15 @@ export function useRealtimeMaintenance() {
       })
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "website_settings" },
+        { event: "*", schema: "public", table: "website_settings" },
         () => {
           fetchStatus();
         }
       )
       .subscribe();
 
-    // 2. Periodic Polling Fallback (every 30s)
-    const interval = setInterval(fetchStatus, 30000);
+    // 2. Periodic Polling Fallback (every 10s for high multi-domain responsiveness)
+    const interval = setInterval(fetchStatus, 10000);
 
     return () => {
       supabase.removeChannel(channel);

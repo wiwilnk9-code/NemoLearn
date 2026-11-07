@@ -80,6 +80,7 @@ import {
   syncNotificationMarkRead,
   syncNotificationMarkAllRead,
   fetchUserNotificationsFromSupabase,
+  fetchWebsiteSettingsFromSupabase,
 } from "./supabase-sync";
 
 export * from "@/types/settings";
@@ -96,6 +97,7 @@ export {
   syncUserDelete,
   syncWebsiteSettingsUpsert,
   syncAISettingsUpsert,
+  fetchWebsiteSettingsFromSupabase,
 } from "./supabase-sync";
 
 export interface DatabaseState {
@@ -2720,6 +2722,19 @@ export const DEFAULT_WEBSITE_SETTINGS: WebsiteSettings = {
 };
 
 export const WebsiteSettingsRepository = {
+  async getLive(): Promise<WebsiteSettings> {
+    const live = await fetchWebsiteSettingsFromSupabase();
+    if (live) {
+      try {
+        const db = loadDb();
+        db.websiteSettings = live;
+        saveDb(db, false);
+      } catch {}
+      return live;
+    }
+    return this.get();
+  },
+
   get(): WebsiteSettings {
     const db = loadDb();
     const stored = db.websiteSettings;

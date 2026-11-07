@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const admin = await requireAuth(["admin", "owner"], "manage_settings", req);
-    const settings = WebsiteSettingsRepository.get();
+    const settings = await WebsiteSettingsRepository.getLive();
     const apiVault = getMaskedApiVault();
     const governanceLogs = getGovernanceAuditLogs(20);
 

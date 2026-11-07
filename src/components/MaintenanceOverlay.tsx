@@ -1,18 +1,43 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import { Wrench, Clock, ShieldAlert, Sparkles, RefreshCw } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Wrench, Clock, ShieldAlert, Sparkles, RefreshCw, ArrowRight } from "lucide-react";
 import { useRealtimeMaintenance } from "@/hooks/useRealtimeMaintenance";
 import { Button } from "@/components/ui/Button";
 
 export const MaintenanceOverlay: React.FC = () => {
+  const pathname = usePathname();
   const { maintenanceMode, maintenance, isBypassed, loading, refresh } = useRealtimeMaintenance();
+  const [isChecking, setIsChecking] = useState(false);
 
-  // If loading or maintenance not active or user is an authorized owner/admin, do not show overlay
-  if (loading || !maintenanceMode || isBypassed) {
+  // If loading or maintenance not active or user is an authorized owner/admin, do not show overlay.
+  // CRITICAL BYPASS: Never block /admin/login so administrators & owners can access the authentication gateway!
+  if (
+    loading ||
+    !maintenanceMode ||
+    isBypassed ||
+    pathname.startsWith("/admin/login")
+  ) {
     return null;
   }
+
+  const handleRefresh = async () => {
+    setIsChecking(true);
+    try {
+      await refresh();
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  // Ensure estimatedEndTime is clearly formatted with Asia/Jakarta (WIB) timezone
+  const displayEndTime = maintenance?.estimatedEndTime
+    ? maintenance.estimatedEndTime.toUpperCase().includes("WIB")
+      ? maintenance.estimatedEndTime
+      : `${maintenance.estimatedEndTime.trim()} WIB`
+    : "14:00 WIB";
 
   return (
     <div className="fixed inset-0 z-[9999] bg-[#FAF9F5] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
@@ -40,16 +65,16 @@ export const MaintenanceOverlay: React.FC = () => {
         <div className="bg-[#FAF9F5] border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 text-left space-y-2">
           <p className="text-xs sm:text-sm text-[#334155] leading-relaxed font-medium">
             {maintenance?.message ||
-              "Platform NemoLearn saat ini sedang menjalani peningkatan infrastruktur dan pemeliharaan rutin terencana untuk meningkatkan kualitas layanan."}
+              "Kami sedang melakukan peningkatan kapasitas server AI & pembaruan database kurikulum. Kami akan kembali online pukul 14:00 WIB."}
           </p>
 
           <div className="pt-2 border-t border-[#E2E8F0] flex items-center justify-between text-xs text-[#64748B]">
             <span className="flex items-center gap-1">
               <Clock className="w-3.5 h-3.5 text-[#16A34A]" />
-              Estimasi Selesai:
+              Estimasi Selesai (WIB):
             </span>
-            <span className="font-bold text-[#0F172A]">
-              {maintenance?.estimatedEndTime || "14:00 WIB"}
+            <span className="font-bold text-[#0F172A] font-mono">
+              {displayEndTime}
             </span>
           </div>
         </div>
@@ -59,20 +84,22 @@ export const MaintenanceOverlay: React.FC = () => {
           <Button
             variant="outline"
             className="w-full flex items-center justify-center gap-2"
-            onClick={() => refresh()}
+            disabled={isChecking}
+            onClick={handleRefresh}
           >
-            <RefreshCw className="w-4 h-4" />
-            Periksa Status Terkini
+            <RefreshCw className={`w-4 h-4 ${isChecking ? "animate-spin text-[#16A34A]" : ""}`} />
+            <span>{isChecking ? "Memeriksa Status Terbaru..." : "Periksa Status Terkini"}</span>
           </Button>
 
-          <div className="flex items-center justify-center gap-2 text-xs text-[#94A3B8]">
-            <ShieldAlert className="w-3.5 h-3.5 text-[#64748B]" />
+          <div className="flex items-center justify-center gap-1.5 text-xs text-[#64748B] pt-1">
+            <ShieldAlert className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
             <span>Administrator atau Owner?</span>
             <Link
               href="/admin/login"
-              className="text-[#16A34A] font-semibold hover:underline"
+              className="text-[#15803D] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer ml-1"
             >
-              Masuk Di Sini
+              <span>Masuk Di Sini</span>
+              <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
         </div>

@@ -189,17 +189,20 @@ export const SettingsTabMaintenance: React.FC<SettingsTabMaintenanceProps> = ({
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
                 <input
                   type="time"
-                  value={maintenance.estimatedEndTime || "14:00"}
-                  onChange={(e) =>
+                  value={(maintenance.estimatedEndTime || "14:00").replace(/ WIB/gi, "").trim()}
+                  onChange={(e) => {
+                    const newTime = e.target.value;
+                    const formatted = newTime ? `${newTime} WIB` : "14:00 WIB";
                     onChange({
                       maintenance: {
                         ...maintenance,
-                        estimatedEndTime: e.target.value,
+                        estimatedEndTime: formatted,
                       },
-                    })
-                  }
+                    });
+                  }}
                   className="bg-slate-50 border border-slate-200 text-slate-900 font-mono px-3 py-1 rounded text-xs focus:outline-none focus:bg-white focus:border-red-400"
                 />
+                <span className="text-xs font-mono font-bold text-slate-700">WIB</span>
               </div>
             </div>
           </div>

@@ -880,3 +880,41 @@ export async function hydrateFromSupabase(): Promise<{
     return null;
   }
 }
+
+export async function fetchWebsiteSettingsFromSupabase(): Promise<WebsiteSettings | null> {
+  if (isTestEnvironment()) return null;
+  try {
+    const { data: wsData, error } = await supabaseServer
+      .from("website_settings")
+      .select("*")
+      .eq("id", "global")
+      .maybeSingle();
+
+    if (error || !wsData) return null;
+
+    return {
+      siteName: wsData.site_name,
+      tagline: wsData.tagline,
+      description: wsData.description,
+      curriculum: wsData.curriculum,
+      logoUrl: wsData.logo_url,
+      enableAIGenerator: Boolean(wsData.enable_ai_generator),
+      enableIRTScoring: Boolean(wsData.enable_irt_scoring),
+      enablePdfExport: Boolean(wsData.enable_pdf_export),
+      maintenanceMode: Boolean(wsData.maintenance_mode),
+      allowPublicRegistration: Boolean(wsData.allow_public_registration),
+      appInfo: wsData.app_info_json || {},
+      maintenance: wsData.maintenance_json || {},
+      broadcast: wsData.broadcast_json || {},
+      rateLimits: wsData.rate_limits_json || {},
+      aiRouting: wsData.ai_routing_json || {},
+      aiQuota: wsData.ai_quota || undefined,
+      security: wsData.security_json || {},
+      updatedAt: wsData.updated_at,
+      updatedBy: wsData.updated_by,
+    };
+  } catch (err: any) {
+    console.warn("[Supabase] Failed to fetch live website settings:", err?.message || err);
+    return null;
+  }
+}

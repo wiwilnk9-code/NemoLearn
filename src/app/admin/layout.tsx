@@ -1,8 +1,7 @@
 import React from "react";
 import { getCurrentUser } from "@/lib/auth";
 import { ReportRepository } from "@/lib/db";
-import { AdminLayoutClient } from "@/components/admin/AdminLayoutClient";
-import { AdminAccessGuard } from "@/components/admin/AdminAccessGuard";
+import { AdminAuthGuardClient } from "@/components/admin/AdminAuthGuardClient";
 
 export const metadata = {
   title: "Admin Dashboard — NemoLearn",
@@ -15,24 +14,14 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const currentUser = await getCurrentUser();
-  const isAllowed = currentUser && (currentUser.role === "admin" || currentUser.role === "owner");
-
-  if (!isAllowed) {
-    return (
-      <div className="min-h-screen bg-[#EEF3F9]">
-        <AdminAccessGuard currentUser={currentUser} loading={false} />
-      </div>
-    );
-  }
-
   const pendingCount = ReportRepository.getPendingCount();
 
   return (
-    <AdminLayoutClient
+    <AdminAuthGuardClient
       currentUser={currentUser}
       pendingReportsCount={pendingCount}
     >
       {children}
-    </AdminLayoutClient>
+    </AdminAuthGuardClient>
   );
 }

@@ -20,6 +20,13 @@ const config: Config = {
           "Roboto",
           "sans-serif",
         ],
+        display: [
+          '"Space Grotesk"',
+          '"Plus Jakarta Sans"',
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
         mono: [
           '"JetBrains Mono"',
           "ui-monospace",

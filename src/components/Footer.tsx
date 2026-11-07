@@ -1,14 +1,31 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { User } from "@/types/user";
 
 export const Footer: React.FC = () => {
   const pathname = usePathname();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Hide footer on admin panel and practice room
-  if (pathname.startsWith("/admin") || pathname.startsWith("/practice")) {
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.user) setCurrentUser(data.user);
+      })
+      .catch(() => {});
+  }, [pathname]);
+
+  // Hide footer on admin panel, practice room, login, and guest landing page
+  // On SSR and initial client hydration, currentUser is null, so for pathname === "/" it consistently returns null
+  if (
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/practice") ||
+    pathname === "/login" ||
+    (pathname === "/" && !currentUser)
+  ) {
     return null;
   }
 

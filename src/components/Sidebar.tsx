@@ -119,11 +119,12 @@ export const Sidebar: React.FC = () => {
     { href: "/profile", label: "Profil", icon: UserIcon },
   ];
 
-  // Hide student sidebar on admin panel, practice room, and login page
+  // Hide student sidebar on admin panel, practice room, login page, and guest landing page
   if (
     pathname.startsWith("/admin") ||
     pathname.startsWith("/practice") ||
-    pathname === "/login"
+    pathname === "/login" ||
+    (pathname === "/" && !currentUser)
   ) {
     return null;
   }
@@ -155,10 +156,10 @@ export const Sidebar: React.FC = () => {
               className="flex items-center gap-2 p-1 pl-2 rounded-xl bg-[#FAF9F5] border border-[#E5E7EB] hover:border-[#16A34A] transition-colors"
             >
               <span className="text-xs font-semibold text-[#0F172A] max-w-[100px] truncate">
-                {currentUser.displayName.split(" ")[0]}
+                {(currentUser.displayName || currentUser.email || "Siswa").split(" ")[0]}
               </span>
               <div className="w-7 h-7 rounded-lg bg-[#F0FDF4] text-[#15803D] font-bold text-xs flex items-center justify-center border border-[#BBF7D0]">
-                {currentUser.displayName.charAt(0)}
+                {(currentUser.displayName || currentUser.email || "S").charAt(0).toUpperCase()}
               </div>
             </button>
           ) : (
@@ -398,15 +399,15 @@ export const Sidebar: React.FC = () => {
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-[#F0FDF4] text-[#15803D] font-bold text-xs flex items-center justify-center border border-[#BBF7D0] shrink-0">
-                      {currentUser.displayName.charAt(0)}
+                      {(currentUser.displayName || currentUser.email || "S").charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
                       <p className="font-bold text-xs text-[#0F172A] truncate leading-tight">
-                        {currentUser.displayName}
+                        {currentUser.displayName || currentUser.email || "Siswa"}
                       </p>
                       <div className="mt-0.5 flex items-center gap-1.5">
-                        <Badge variant={getRoleBadgeVariant(currentUser.role)} size="xs">
-                          {currentUser.role.toUpperCase()}
+                        <Badge variant={getRoleBadgeVariant(currentUser.role || "pelajar")} size="xs">
+                          {(currentUser.role || "pelajar").toUpperCase()}
                         </Badge>
                       </div>
                     </div>
@@ -432,14 +433,14 @@ export const Sidebar: React.FC = () => {
                         Profil Aktif
                       </p>
                       <p className="text-xs font-bold text-[#0F172A] truncate">
-                        {currentUser.displayName}
+                        {currentUser.displayName || currentUser.email || "Siswa"}
                       </p>
                       <p className="text-[11px] text-[#64748B] truncate">
-                        {currentUser.email}
+                        {currentUser.email || ""}
                       </p>
                       <div className="mt-1">
                         <span className="text-[10px] bg-[#F1F5F9] text-[#475467] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                          {currentUser.role}
+                          {currentUser.role || "pelajar"}
                         </span>
                       </div>
                     </div>

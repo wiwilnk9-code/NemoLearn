@@ -33,6 +33,8 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Skeleton, SkeletonCard, SkeletonText } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 
+import { LandingPage } from "@/components/landing/LandingPage";
+
 export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [sessions, setSessions] = useState<
@@ -91,7 +93,7 @@ export default function HomePage() {
 
   // 1. Tampilan Pengunjung Belum Login
   if (!currentUser) {
-    return <GuestLandingView />;
+    return <LandingPage />;
   }
 
   // 2. Tampilan Khusus Guru
@@ -173,8 +175,9 @@ function StudentDashboardView({
   weekStart.setHours(0, 0, 0, 0);
 
   const completedThisWeek = completedSessions.filter((s) => {
+    if (!s.startedAt) return false;
     const sDate = new Date(s.startedAt);
-    return sDate >= weekStart;
+    return !isNaN(sDate.getTime()) && sDate >= weekStart;
   }).length;
 
   // Pemetaan hari dalam 1 minggu untuk Weekly Progress Calendar
@@ -194,8 +197,9 @@ function StudentDashboardView({
       const isToday = d.dayNum === todayIndex;
       // Periksa apakah ada sesi di hari tersebut
       const hasSession = completedSessions.some((s) => {
+        if (!s.startedAt) return false;
         const sDate = new Date(s.startedAt);
-        return sDate.getDay() === d.dayNum;
+        return !isNaN(sDate.getTime()) && sDate.getDay() === d.dayNum;
       });
 
       return {
@@ -210,7 +214,7 @@ function StudentDashboardView({
   const subjectStats = useMemo(() => {
     const map: Record<string, { name: string; count: number; sessions: number }> = {};
     completedSessions.forEach((s) => {
-      const subId = s.config.subjectId;
+      const subId = s.config?.subjectId || "lainnya";
       const subName = s.subjectName || subId;
       if (!map[subId]) {
         map[subId] = { name: subName, count: 0, sessions: 0 };
@@ -252,7 +256,7 @@ function StudentDashboardView({
             </div>
 
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
-              Halo, {currentUser.displayName}! ✨
+              Halo, {currentUser?.displayName || currentUser?.email?.split("@")[0] || "Siswa"}! ✨
             </h1>
 
             <p className="text-xs sm:text-sm text-white/90 leading-relaxed max-w-xl">
@@ -310,7 +314,7 @@ function StudentDashboardView({
             <div>
               <div className="flex items-center gap-2">
                 <Badge variant="lime" size="xs">
-                  AKSES {currentUser.role.toUpperCase()}
+                  AKSES {(currentUser.role || "admin").toUpperCase()}
                 </Badge>
                 <span className="text-xs text-white/70">Mode Pengelolaan Sistem</span>
               </div>
@@ -569,11 +573,13 @@ function StudentDashboardView({
                       <p className="text-[11px] text-[#64748B] flex items-center gap-1.5">
                         <Calendar className="w-3 h-3 text-[#94A3B8]" />
                         <span>
-                          {new Date(s.startedAt).toLocaleDateString("id-ID", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          {s.startedAt && !isNaN(new Date(s.startedAt).getTime())
+                            ? new Date(s.startedAt).toLocaleDateString("id-ID", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"}
                         </span>
                         <span>&bull;</span>
                         <span>{s.questionIds?.length || 0} Soal</span>
@@ -805,7 +811,7 @@ function TeacherDashboardView({
             </Badge>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight">
-            Selamat Datang, {currentUser.displayName}
+            Selamat Datang, {currentUser?.displayName || currentUser?.email?.split("@")[0] || "Guru"}
           </h1>
           <p className="text-xs sm:text-sm text-[#64748B]">
             Panel kurikulum dan pengawasan bank soal latihan SMA. Kelola dan pantau mutu butir soal.
@@ -886,234 +892,6 @@ function TeacherDashboardView({
           </CardContent>
         </Card>
       </div>
-    </div>
-  );
-}
-
-// =========================================================================
-// 3. GUEST LANDING VIEW
-// =========================================================================
-function GuestLandingView() {
-  const smaSubjects = [
-    { name: "Matematika", id: "matematika", desc: "Aljabar, Trigonometri, Kalkulus, Matriks", tag: "Wajib & Peminatan" },
-    { name: "Fisika", id: "fisika", desc: "Kinematika, Dinamika Newton, Termodinamika", tag: "Saintek" },
-    { name: "Kimia", id: "kimia", desc: "Stoikiometri, Larutan Asam-Basa, Redoks", tag: "Saintek" },
-    { name: "Biologi", id: "biologi", desc: "Biologi Sel, Genetika Mendel, Ekosistem", tag: "Saintek" },
-    { name: "Ekonomi", id: "ekonomi", desc: "Mekanisme Pasar, Pendapatan Nasional, Akuntansi", tag: "Soshum" },
-    { name: "Sosiologi", id: "sosiologi", desc: "Interaksi Sosial, Perubahan Sosial, Konflik", tag: "Soshum" },
-    { name: "Geografi", id: "geografi", desc: "Litosfer, Atmosfer, SIG & Penginderaan Jauh", tag: "Soshum" },
-    { name: "Bahasa Indonesia", id: "bahasa-indonesia", desc: "Teks Eksplanasi, Argumentasi, Karya Ilmiah", tag: "Umum" },
-    { name: "Bahasa Inggris", id: "bahasa-inggris", desc: "Analytical Exposition, Reading Comprehension", tag: "Umum" },
-  ];
-
-  return (
-    <div className="space-y-12 sm:space-y-16 pb-16">
-      {/* Editorial Hero Section */}
-      <section className="relative overflow-hidden pt-8 sm:pt-14 pb-12 sm:pb-16 bg-white border-b border-[#E5E7EB]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center text-center max-w-3xl mx-auto space-y-4">
-            <Badge variant="green" size="md">
-              Kurikulum Merdeka 2026 • SMA Kelas 10, 11, dan 12
-            </Badge>
-
-            <h1 className="text-3xl sm:text-5xl font-extrabold text-[#0F172A] tracking-tight leading-[1.15]">
-              Kuasai Materi Pelajaran SMA dengan{" "}
-              <span className="text-[#16A34A]">Penilaian Terkalibrasi</span> & Evaluasi Terarah
-            </h1>
-
-            <p className="text-sm sm:text-base text-[#475569] max-w-2xl leading-relaxed">
-              Platform latihan mandiri siswa SMA. Dilengkapi bank soal berstandar nasional, penulisan rumus KaTeX presisi, penilaian IRT (Item Response Theory), dan pembahasan konsep mendalam.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 w-full sm:w-auto justify-center">
-              <Link href="/generator" className="w-full sm:w-auto">
-                <Button size="lg" variant="primary" className="w-full" leftIcon={<Sparkles className="w-4 h-4" />}>
-                  Mulai Latihan Mandiri
-                </Button>
-              </Link>
-              <Link href="/bank-soal" className="w-full sm:w-auto">
-                <Button variant="outline" size="lg" className="w-full" leftIcon={<Layers className="w-4 h-4 text-[#16A34A]" />}>
-                  Jelajahi Bank Soal
-                </Button>
-              </Link>
-              <Link href="/login" className="w-full sm:w-auto">
-                <Button variant="secondary" size="lg" className="w-full" rightIcon={<ArrowRight className="w-4 h-4" />}>
-                  Masuk Akun
-                </Button>
-              </Link>
-            </div>
-          </div>
-
-          {/* Interactive KaTeX Formula Showcase */}
-          <div className="mt-10 sm:mt-12 max-w-4xl mx-auto">
-            <div className="bg-[#FAF9F5] border border-[#E5E7EB] rounded-2xl p-5 sm:p-6 shadow-card">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 mb-4 border-b border-[#E5E7EB]">
-                <div>
-                  <h3 className="font-bold text-sm sm:text-base text-[#0F172A]">
-                    Notasi Formula KaTeX Standar UTBK & Kurikulum SMA
-                  </h3>
-                  <p className="text-xs text-[#64748B]">
-                    Penulisan simbol matematika, fisika, dan kimia terstruktur tanpa layout shift
-                  </p>
-                </div>
-                <Badge variant="green" size="sm">
-                  KaTeX Validated
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-center">
-                <div className="p-3.5 rounded-xl bg-white border border-[#E5E7EB]">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748B] mb-1">
-                    Fisika (Dinamika Gerak)
-                  </p>
-                  <div className="text-sm text-[#0F172A] font-semibold py-1">
-                    <MathRenderer text="\\[ \vec{F}_{\text{total}} = m \cdot \vec{a} = \frac{d\vec{p}}{dt} \\]" />
-                  </div>
-                  <p className="text-[11px] text-[#64748B]">Hukum II Newton</p>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-white border border-[#E5E7EB]">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748B] mb-1">
-                    Matematika (Kalkulus Integral)
-                  </p>
-                  <div className="text-sm text-[#0F172A] font-semibold py-1">
-                    <MathRenderer text="\\[ \int_0^1 x^2 \, dx = \left[ \frac{x^3}{3} \right]_0^1 = \frac{1}{3} \\]" />
-                  </div>
-                  <p className="text-[11px] text-[#64748B]">Teorema Dasar Kalkulus</p>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-white border border-[#E5E7EB]">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748B] mb-1">
-                    Fisika Modern (Relativitas)
-                  </p>
-                  <div className="text-sm text-[#0F172A] font-semibold py-1">
-                    <MathRenderer text="\\[ E^2 = (pc)^2 + (m_0 c^2)^2 \\]" />
-                  </div>
-                  <p className="text-[11px] text-[#64748B]">Relasi Energi-Momentum</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3 Core Pillars */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-2xl mx-auto mb-8">
-          <span className="ui-label text-[#16A34A]">Keunggulan Pembelajaran</span>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight mt-1">
-            Mengapa Berlatih di NemoLearn?
-          </h2>
-          <p className="text-xs sm:text-sm text-[#64748B] mt-1">
-            Dirancang secara spesifik untuk meningkatkan pemahaman konsep, bukan sekadar hafalan.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <Card>
-            <CardHeader>
-              <div className="w-10 h-10 rounded-xl bg-[#F0FDF4] text-[#15803D] flex items-center justify-center font-bold mb-2">
-                <BookOpen className="w-5 h-5" />
-              </div>
-              <CardTitle>Kurikulum Merdeka SMA Lengkap</CardTitle>
-              <CardDescription>
-                Mencakup 9 mata pelajaran SMA esensial untuk kelas 10, 11, dan 12. Soal terstruktur berdasarkan capaian pembelajaran bertahap.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#15803D]">
-                <Check className="w-4 h-4" />
-                <span>Saintek, Soshum, dan Bahasa</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="w-10 h-10 rounded-xl bg-[#F7FEE7] text-[#4D7C0F] flex items-center justify-center font-bold mb-2">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <CardTitle>Penilaian IRT (Item Response Theory)</CardTitle>
-              <CardDescription>
-                Mengukur parameter kemampuan siswa (skala standar 200–1.000) menggunakan model 3-PL terkalibrasi berstandar seleksi nasional.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#4D7C0F]">
-                <Check className="w-4 h-4" />
-                <span>Skor terkalibrasi ilmiah</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="w-10 h-10 rounded-xl bg-[#FFF7ED] text-[#C2410C] flex items-center justify-center font-bold mb-2">
-                <Sparkles className="w-5 h-5 text-[#EA580C]" />
-              </div>
-              <CardTitle>Pembahasan Konseptual Terstruktur</CardTitle>
-              <CardDescription>
-                Setiap butir soal dilengkapi penalaran langkah demi langkah (step-by-step) untuk membedah akar konsep dan cara berpikir ilmiah.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#C2410C]">
-                <Check className="w-4 h-4" />
-                <span>Kunci jawaban aman tanpa bocor</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Subject List Grid */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-          <div>
-            <span className="ui-label text-[#16A34A]">Materi Terbuka</span>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F172A] tracking-tight mt-1">
-              9 Mata Pelajaran Kurikulum SMA
-            </h2>
-            <p className="text-xs text-[#64748B]">
-              Tersedia untuk latihan mandiri berbasis kemampuan
-            </p>
-          </div>
-          <Link href="/bank-soal">
-            <Button variant="outline" size="sm" rightIcon={<ArrowRight className="w-3.5 h-3.5" />}>
-              Buka Semua Bank Soal
-            </Button>
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {smaSubjects.map((sub) => (
-            <Link
-              key={sub.id}
-              href={`/generator?subject=${sub.id}`}
-              className="p-4 rounded-xl border border-[#E5E7EB] bg-white hover:border-[#16A34A] hover:shadow-card transition-all group flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Badge variant="green" size="xs">
-                    {sub.tag}
-                  </Badge>
-                  <ArrowRight className="w-3.5 h-3.5 text-[#94A3B8] group-hover:text-[#16A34A] transition-transform group-hover:translate-x-1" />
-                </div>
-                <h3 className="font-bold text-sm text-[#0F172A] group-hover:text-[#16A34A] transition-colors">
-                  {sub.name}
-                </h3>
-                <p className="text-[11px] text-[#64748B] mt-0.5 line-clamp-1">
-                  {sub.desc}
-                </p>
-              </div>
-              <div className="pt-3 mt-3 border-t border-[#F3F4EE] flex items-center justify-between text-[11px]">
-                <span className="text-[#64748B]">Kurikulum Merdeka</span>
-                <span className="font-semibold text-[#16A34A]">Latihan &rarr;</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

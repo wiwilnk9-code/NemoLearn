@@ -6,6 +6,7 @@
 # Testing
 /coverage
 /scratch
+.taste-skill/
 
 # Next.js
 /.next/
